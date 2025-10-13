@@ -1,7 +1,7 @@
 using System.Net;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
 using Microsoft.Extensions.Logging;
@@ -24,10 +24,24 @@ public class HrmFunctions
             Description = "A JSON object containing the authenticated user's Employee ID.")]
     [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.Unauthorized, Description = "Unauthorized - Invalid or missing Bearer token.")]
     [Function("GetAuthenticatedUserId")]
-    public IActionResult GetAuthenticatedUserId([HttpTrigger(AuthorizationLevel.Function, "get", Route = "service/customreport2/tenant/GPT_RAAS")] HttpRequest req)
+    public async Task<HttpResponseData> GetAuthenticatedUserId([HttpTrigger(AuthorizationLevel.Function, "get", Route = "service/customreport2/tenant/GPT_RAAS")] HttpRequestData req)
     {
-        _logger.LogInformation("C# HTTP trigger function processed a request.");
-        return new OkObjectResult("Welcome to Azure Functions!");
+        _logger.LogInformation("Getting authenticated user ID");
+
+        // Extract user email from claims (simulated)
+        var userEmail = GetUserEmailFromToken(req);
+
+        if (string.IsNullOrEmpty(userEmail) || !MockDataStore.UserToEmployeeId.ContainsKey(userEmail))
+        {
+            return await CreateErrorResponse(req, HttpStatusCode.Unauthorized, "Invalid or missing authentication");
+        }
+
+        var employeeId = MockDataStore.UserToEmployeeId[userEmail];
+        var response = req.CreateResponse(HttpStatusCode.OK);
+
+        await response.WriteAsJsonAsync(new EmployeeIdResponse(employeeId));
+
+        return response;
     }
 
     [OpenApiOperation(operationId: "getEligibleAbsenceTypes", Summary = "Retrieve eligible absence types by Employee ID.", Description = "Fetches a list of eligible absence types for a worker by their Employee ID, with a fixed category filter.")]
@@ -39,10 +53,28 @@ public class HrmFunctions
     [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.Unauthorized, Description = "Unauthorized - Invalid or missing Bearer token.")]
     [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.NotFound, Description = "Worker or absence types not found.")]
     [Function("GetEligibleAbsenceTypes")]
-    public IActionResult GetEligibleAbsenceTypes([HttpTrigger(AuthorizationLevel.Function, "get", Route = "api/absenceManagement/v1/tenant/workers/Employee_ID={employeeId}/eligibleAbsenceTypes")] HttpRequest req)
+    public async Task<HttpResponseData> GetEligibleAbsenceTypes([HttpTrigger(AuthorizationLevel.Function, "get", Route = "api/absenceManagement/v1/tenant/workers/Employee_ID={employeeId}/eligibleAbsenceTypes")] HttpRequestData req, string employeeId)
     {
-        _logger.LogInformation("C# HTTP trigger function processed a request.");
-        return new OkObjectResult("Welcome to Azure Functions!");
+        _logger.LogInformation($"Getting eligible absence types for employee {employeeId}");
+
+        if (!MockDataStore.Workers.ContainsKey(employeeId))
+        {
+            return await CreateErrorResponse(req, HttpStatusCode.NotFound, "Worker not found");
+        }
+
+        // Check for category query parameter (required per spec)
+        var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+        var category = query["category"];
+
+        if (string.IsNullOrEmpty(category))
+        {
+            return await CreateErrorResponse(req, HttpStatusCode.BadRequest, "Category parameter required");
+        }
+
+        var response = req.CreateResponse(HttpStatusCode.OK);
+        await response.WriteAsJsonAsync(
+            new AbsenceTypesResponse(MockDataStore.AbsenceTypes));
+        return response;
     }
 
     [OpenApiOperation(operationId: "getWorkerById", Summary = "Retrieve worker details by Employee ID.", Description = "Fetches detailed information of a worker using their Employee ID.")]
@@ -53,10 +85,18 @@ public class HrmFunctions
     [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.Unauthorized, Description = "Unauthorized - Invalid or missing Bearer token.")]
     [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.NotFound, Description = "Worker not found.")]
     [Function("GetWorkerById")]
-    public IActionResult GetWorkerById([HttpTrigger(AuthorizationLevel.Function, "get", Route = "api/absenceManagement/v1/tenant/workers/Employee_ID={employeeId}")] HttpRequest req)
+    public async Task<HttpResponseData> GetWorkerById([HttpTrigger(AuthorizationLevel.Function, "get", Route = "api/absenceManagement/v1/tenant/workers/Employee_ID={employeeId}")] HttpRequestData req, string employeeId)
     {
-        _logger.LogInformation("C# HTTP trigger function processed a request.");
-        return new OkObjectResult("Welcome to Azure Functions!");
+        _logger.LogInformation($"Getting worker details for employee {employeeId}");
+
+        if (!MockDataStore.Workers.TryGetValue(employeeId, out var worker))
+        {
+            return await CreateErrorResponse(req, HttpStatusCode.NotFound, "Worker not found");
+        }
+
+        var response = req.CreateResponse(HttpStatusCode.OK);
+        await response.WriteAsJsonAsync(worker);
+        return response;
     }
 
     [OpenApiOperation(operationId: "requestTimeOff", Summary = "Request time off for a worker.", Description = "Allows a worker to request time off by providing the necessary details.")]
@@ -68,10 +108,48 @@ public class HrmFunctions
     [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.Unauthorized, Description = "Unauthorized - Invalid or missing Bearer token.")]
     [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.NotFound, Description = "Worker not found.")]
     [Function("RequestTimeOff")]
-    public IActionResult RequestTimeOff([HttpTrigger(AuthorizationLevel.Function, "post", Route = "api/absenceManagement/v1/tenant/workers/Employee_ID={employeeId}/requestTimeOff")] HttpRequest req)
+    public async Task<HttpResponseData> RequestTimeOff([HttpTrigger(AuthorizationLevel.Function, "post", Route = "api/absenceManagement/v1/tenant/workers/Employee_ID={employeeId}/requestTimeOff")] HttpRequestData req, string employeeId)
     {
-        _logger.LogInformation("C# HTTP trigger function processed a request.");
-        return new OkObjectResult("Welcome to Azure Functions!");
+        _logger.LogInformation($"Requesting time off for employee {employeeId}");
+
+        if (!MockDataStore.Workers.ContainsKey(employeeId))
+        {
+            return await CreateErrorResponse(req, HttpStatusCode.NotFound, "Worker not found");
+        }
+
+        TimeOffRequest? timeOffRequest;
+        try
+        {
+            timeOffRequest = await req.ReadFromJsonAsync<TimeOffRequest>();
+            if (timeOffRequest == null || timeOffRequest.Days == null || !timeOffRequest.Days.Any())
+            {
+                return await CreateErrorResponse(req, HttpStatusCode.BadRequest, "Invalid request body");
+            }
+        }
+        catch
+        {
+            return await CreateErrorResponse(req, HttpStatusCode.BadRequest, "Invalid JSON format");
+        }
+
+        // Validate time off type IDs
+        var validTimeOffTypeIds = MockDataStore.AbsenceTypes.Select(a => a.Id).ToHashSet();
+        foreach (var day in timeOffRequest.Days)
+        {
+            if (!validTimeOffTypeIds.Contains(day.TimeOffType.Id))
+            {
+                return await CreateErrorResponse(req, HttpStatusCode.BadRequest, 
+                    $"Invalid time off type ID: {day.TimeOffType.Id}");
+            }
+        }
+
+        // Store the request
+        MockDataStore.TimeOffRequests.Add(timeOffRequest);
+        var requestId = Guid.NewGuid().ToString();
+
+        var response = req.CreateResponse(HttpStatusCode.OK);
+        await response.WriteAsJsonAsync(
+            new TimeOffResponse(true, "Time off request created successfully", requestId));
+        return response;
     }
 
     [OpenApiOperation(operationId: "getWorkerBenefitPlans", Summary = "Retrieve worker benefit plans enrolled by Employee ID.", Description = "Fetches the benefit plans in which the worker is enrolled using their Employee ID.")]
@@ -83,9 +161,49 @@ public class HrmFunctions
     [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.Unauthorized, Description = "Unauthorized - Invalid or missing Bearer token.")]
     [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.NotFound, Description = "Worker or benefit plans not found.")]
     [Function("GetWorkerBenefitPlans")]
-    public IActionResult GetWorkerBenefitPlans([HttpTrigger(AuthorizationLevel.Function, "get", Route = "service/customreport2/tenant/GPT_Worker_Benefit_Data")] HttpRequest req)
+    public async Task<HttpResponseData> GetWorkerBenefitPlans([HttpTrigger(AuthorizationLevel.Function, "get", Route = "service/customreport2/tenant/GPT_Worker_Benefit_Data")] HttpRequestData req)
     {
-        _logger.LogInformation("C# HTTP trigger function processed a request.");
-        return new OkObjectResult("Welcome to Azure Functions!");
+        _logger.LogInformation("Getting worker benefit plans");
+
+        var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+        var employeeId = query["Worker!Employee_ID"];
+        var format = query["format"];
+
+        if (string.IsNullOrEmpty(employeeId))
+        {
+            return await CreateErrorResponse(req, HttpStatusCode.BadRequest, "Employee ID required");
+        }
+
+        if (format != "json")
+        {
+            return await CreateErrorResponse(req, HttpStatusCode.BadRequest, "Only JSON format supported");
+        }
+
+        if (!MockDataStore.BenefitPlans.TryGetValue(employeeId, out var plans))
+        {
+            return await CreateErrorResponse(req, HttpStatusCode.NotFound, "Benefit plans not found");
+        }
+
+        var response = req.CreateResponse(HttpStatusCode.OK);
+        await response.WriteAsJsonAsync(new BenefitPlansResponse(plans));
+        return response;
+    }
+
+    private string GetUserEmailFromToken(HttpRequestData req)
+    {
+        // In a real implementation, this would parse the JWT token
+        // For demo purposes, we'll use a header or return a default user
+        if (req.Headers.TryGetValues("X-User-Email", out var emails))
+        {
+            return emails.FirstOrDefault() ?? "user1@globomantics.com";
+        }
+        return "user1@globomantics.com"; // Default for demo
+    }
+
+    private async Task<HttpResponseData> CreateErrorResponse(HttpRequestData req, HttpStatusCode statusCode, string message)
+    {
+        var response = req.CreateResponse(statusCode);
+        await response.WriteAsJsonAsync(new { error = message });
+        return response;
     }
 }

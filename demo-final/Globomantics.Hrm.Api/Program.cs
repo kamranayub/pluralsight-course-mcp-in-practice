@@ -5,6 +5,7 @@ using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Configurations;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.OpenApi.Models;
+using System.Text.Json;
 
 var builder = FunctionsApplication.CreateBuilder(args);
 
@@ -13,6 +14,10 @@ builder.ConfigureFunctionsWebApplication();
 builder.Services
     .AddApplicationInsightsTelemetryWorkerService()
     .ConfigureFunctionsApplicationInsights()
+    .Configure<JsonSerializerOptions>(options =>
+    {
+        options.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+    })
     .AddSingleton<IOpenApiConfigurationOptions>(_ =>
     {
         return new OpenApiConfigurationOptions
