@@ -1,12 +1,11 @@
 using System.ComponentModel;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using ModelContextProtocol.Server;
 
 namespace Globomantics.Mcp.Server;
 
 [McpServerResourceType]
-public static class Resources
+public static class StaticResources
 {
     [McpServerResource(UriTemplate = "globomantics://hrm/holidays", Name = "Holiday Calendar", MimeType = "text/plain")]
     [Description("The current year holiday calendar")]

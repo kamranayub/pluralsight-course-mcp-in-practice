@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Azure.Identity;
+using Azure.Storage.Blobs;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -15,6 +17,10 @@ builder.Services.AddMcpServer()
     .WithResourcesFromAssembly()
     .WithToolsFromAssembly()
     .WithPromptsFromAssembly();
+
+builder.Services.AddSingleton(_ => new BlobServiceClient(
+        new Uri("https://psmcpdemo.blob.core.windows.net/"),
+        new DefaultAzureCredential()));
 
 var app = builder.Build();
 
