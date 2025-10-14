@@ -1,5 +1,6 @@
 ﻿using Azure.Identity;
 using Azure.Storage.Blobs;
+using Globomantics.Mcp.Server;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -16,7 +17,8 @@ builder.Services.AddMcpServer()
     .WithStdioServerTransport()
     .WithResourcesFromAssembly()
     .WithToolsFromAssembly()
-    .WithPromptsFromAssembly();
+    .WithPromptsFromAssembly()
+    .WithCompleteHandler(Completions.CompleteHandler);
 
 builder.Services.AddSingleton(_ => new BlobServiceClient(
         new Uri("https://psmcpdemo.blob.core.windows.net/"),
