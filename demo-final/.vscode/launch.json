@@ -1,11 +1,25 @@
 {
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Attach to .NET Functions",
-            "type": "coreclr",
-            "request": "attach",
-            "processId": "${command:azureFunctions.pickProcess}",
-        }
-    ]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Attach to .NET Functions",
+      "type": "coreclr",
+      "request": "attach",
+      "processId": "${command:azureFunctions.pickProcess}"
+    },
+    {
+      "name": "Debug MCP Server (stdio)",
+      "type": "dotnetwatchattach",
+      "request": "attach",
+      "program": "Globomantics.Mcp.Server.exe",
+      "task": "Run MCP Inspector (stdio -> dotnet run)",
+    },
+    {
+      "name": "Debug MCP Server - Azure (stdio)",
+      "type": "dotnetwatchattach",
+      "request": "attach",
+      "program": "Globomantics.Mcp.Server.exe",
+      "task": "Run MCP Inspector - Azure (stdio -> npm run dev:az)",
+    }
+  ]
 }

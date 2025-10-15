@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "globomantics-hrm": {
+      "command": "dotnet",
+      "args": ["run"]
+    }
+  }
+}
