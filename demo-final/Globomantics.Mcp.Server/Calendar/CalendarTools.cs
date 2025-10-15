@@ -16,7 +16,7 @@ public static class Tools
             Content = [
                 new TextContentBlock
                 {
-                    Text = "You can find the Globomantics work calendar below"
+                    Text = "You can find the Globomantics work calendar below along with the current employee's absence calendar details for planning time off work."
                 },
                 new EmbeddedResourceBlock
                 {
@@ -25,6 +25,15 @@ public static class Tools
                         Uri = CalendarResources.ResourceWorkCalendarUri,
                         MimeType = "application/json",
                         Text = CalendarResources.WorkCalendarResource()
+                    }
+                },
+                new EmbeddedResourceBlock
+                {
+                    Resource = new TextResourceContents()
+                    {
+                        Uri = CalendarResources.ResourceEmployeeCalendarUri,
+                        MimeType = "application/json",
+                        Text = CalendarResources.EmployeeCalendarResource()
                     }
                 }
             ],
