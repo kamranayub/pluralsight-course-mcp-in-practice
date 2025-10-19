@@ -5,7 +5,7 @@ public static class MockDataStore
     // Map email to employee ID (simulating authenticated user lookup)
     public static readonly Dictionary<string, string> UserToEmployeeId = new()
     {
-        { "user1@globomantics.com", "5050" },
+        { "psazureuser@kamranayub.com", "5050" },
         { "user2@globomantics.com", "5020" },
         { "user3@globomantics.com", "3050" }
     };
@@ -17,9 +17,9 @@ public static class MockDataStore
             "5050",
             new Worker(
                 "5050",
-                new WorkerName("John", "Doe"),
+                new WorkerName("Kamran", "Ayub"),
                 "Software Engineer",
-                "john.doe@globomantics.com"
+                "psazureuser@kamranayub.com"
             )
         },
         {
