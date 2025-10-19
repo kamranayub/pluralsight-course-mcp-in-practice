@@ -6,7 +6,7 @@ public static class MockDataStore
     public static readonly Dictionary<string, string> UserToEmployeeId = new()
     {
         { "psazureuser@kamranayub.com", "5050" },
-        { "user2@globomantics.com", "5020" },
+        { "subkamran@hotmail.com", "5020" },
         { "user3@globomantics.com", "3050" }
     };
 
@@ -17,7 +17,7 @@ public static class MockDataStore
             "5050",
             new Worker(
                 "5050",
-                new WorkerName("Kamran", "Ayub"),
+                new WorkerName("PS", "User"),
                 "Software Engineer",
                 "psazureuser@kamranayub.com"
             )
@@ -26,9 +26,9 @@ public static class MockDataStore
             "5020",
             new Worker(
                 "5020",
-                new WorkerName("Jane", "Smith"),
-                "Product Manager",
-                "jane.smith@globomantics.com"
+                new WorkerName("Kamran", "Ayub"),
+                "CEO",
+                "subkamran@hotmail.com"
             )
         },
         {
