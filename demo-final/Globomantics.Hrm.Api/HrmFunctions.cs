@@ -26,9 +26,9 @@ public class HrmFunctions
     [Function("GetAuthenticatedUserId")]
     public async Task<HttpResponseData> GetAuthenticatedUserId([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "service/customreport2/tenant/GPT_RAAS")] HttpRequestData req)
     {
-        _logger.LogInformation("Getting authenticated user ID");
+        var userEmail = GetUserEmailClaimFromRequest(req);
 
-        var userEmail = GetUserEmailFromToken(req);
+        _logger.LogInformation($"Getting authenticated user ID for principal name: {userEmail}");
 
         if (string.IsNullOrEmpty(userEmail) || !MockDataStore.UserToEmployeeId.ContainsKey(userEmail))
         {
@@ -184,10 +184,16 @@ public class HrmFunctions
         return response;
     }
 
-    private string GetUserEmailFromToken(HttpRequestData req)
+    private string GetUserEmailClaimFromRequest(HttpRequestData req)
     {
-        var claims = req.Identities.SelectMany(i => i.Claims).ToList();
-        return claims?.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value ?? "user@globomantics.com"; // Default for no authentication
+        var claimsPrincipal = ClaimsPrincipalParser.Parse(req);
+
+        foreach(var claim in claimsPrincipal.Claims)
+        {
+            _logger.LogInformation($"Parsed Claim Type: {claim.Type}, Value: {claim.Value}");
+        }
+
+        return claimsPrincipal.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value ?? "user@globomantics.com"; // Default for no authentication
     }
 
     private async Task<HttpResponseData> CreateErrorResponse(HttpRequestData req, HttpStatusCode statusCode, string message)

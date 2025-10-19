@@ -19,7 +19,7 @@ public static class MockDataStore
                 "5050",
                 new WorkerName("PS", "User"),
                 "Software Engineer",
-                "psazureuser@kamranayub.com"
+                "employee@globomantics.com"
             )
         },
         {
@@ -28,7 +28,7 @@ public static class MockDataStore
                 "5020",
                 new WorkerName("Kamran", "Ayub"),
                 "CEO",
-                "subkamran@hotmail.com"
+                "ceo@globomantics.com"
             )
         },
         {
