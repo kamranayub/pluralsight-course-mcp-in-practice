@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -19,7 +20,6 @@ public class HrmFunctions
     }
 
     [OpenApiOperation(operationId: "getAuthenticatedUserIdRaaS", Summary = "Retrieve the Employee ID for the authenticated user.", Description = "Fetches the Employee ID for the authenticated user from Globomantics HRM.")]
-    [OpenApiSecurity("function_key", SecuritySchemeType.ApiKey, Name = "code", In = OpenApiSecurityLocationType.Query)]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(object),
             Description = "A JSON object containing the authenticated user's Employee ID.")]
     [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.Unauthorized, Description = "Unauthorized - Invalid or missing Bearer token.")]
@@ -28,7 +28,6 @@ public class HrmFunctions
     {
         _logger.LogInformation("Getting authenticated user ID");
 
-        // Extract user email from claims (simulated)
         var userEmail = GetUserEmailFromToken(req);
 
         if (string.IsNullOrEmpty(userEmail) || !MockDataStore.UserToEmployeeId.ContainsKey(userEmail))
@@ -45,7 +44,6 @@ public class HrmFunctions
     }
 
     [OpenApiOperation(operationId: "getEligibleAbsenceTypes", Summary = "Retrieve eligible absence types by Employee ID.", Description = "Fetches a list of eligible absence types for a worker by their Employee ID, with a fixed category filter.")]
-    [OpenApiSecurity("function_key", SecuritySchemeType.ApiKey, Name = "code", In = OpenApiSecurityLocationType.Query)]
     [OpenApiParameter(name: "employeeId", In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = "The Employee ID of the worker (passed as `Employee_ID=3050` in the URL).")]
     [OpenApiParameter(name: "category", In = ParameterLocation.Query, Required = true, Type = typeof(string), Description = "Fixed category filter for the request. This cannot be changed.")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(object),
@@ -78,7 +76,6 @@ public class HrmFunctions
     }
 
     [OpenApiOperation(operationId: "getWorkerById", Summary = "Retrieve worker details by Employee ID.", Description = "Fetches detailed information of a worker using their Employee ID.")]
-    [OpenApiSecurity("function_key", SecuritySchemeType.ApiKey, Name = "code", In = OpenApiSecurityLocationType.Query)]
     [OpenApiParameter(name: "employeeId", In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = "The Employee ID of the worker.")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(object),
             Description = "A JSON object containing worker details.")]
@@ -100,7 +97,6 @@ public class HrmFunctions
     }
 
     [OpenApiOperation(operationId: "requestTimeOff", Summary = "Request time off for a worker.", Description = "Allows a worker to request time off by providing the necessary details.")]
-    [OpenApiSecurity("function_key", SecuritySchemeType.ApiKey, Name = "code", In = OpenApiSecurityLocationType.Query)]
     [OpenApiParameter(name: "employeeId", In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = "The Employee ID of the worker requesting time off.")]
     [OpenApiRequestBody(contentType: "application/json", bodyType: typeof(object), Required = true, Description = "Time off request details including days, dates, and time off type.")]
     [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.OK, Description = "Time off request created successfully.")]
@@ -153,7 +149,6 @@ public class HrmFunctions
     }
 
     [OpenApiOperation(operationId: "getWorkerBenefitPlans", Summary = "Retrieve worker benefit plans enrolled by Employee ID.", Description = "Fetches the benefit plans in which the worker is enrolled using their Employee ID.")]
-    [OpenApiSecurity("function_key", SecuritySchemeType.ApiKey, Name = "code", In = OpenApiSecurityLocationType.Query)]
     [OpenApiParameter(name: "Worker!Employee_ID", In = ParameterLocation.Query, Required = true, Type = typeof(string), Description = "The Employee ID of the worker.")]
     [OpenApiParameter(name: "format", In = ParameterLocation.Query, Required = true, Type = typeof(string), Description = "The format of the response (e.g., `json`).")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(object),
@@ -191,13 +186,8 @@ public class HrmFunctions
 
     private string GetUserEmailFromToken(HttpRequestData req)
     {
-        // In a real implementation, this would parse the JWT token
-        // For demo purposes, we'll use a header or return a default user
-        if (req.Headers.TryGetValues("X-User-Email", out var emails))
-        {
-            return emails.FirstOrDefault() ?? "user1@globomantics.com";
-        }
-        return "user1@globomantics.com"; // Default for demo
+        var claims = req.Identities.SelectMany(i => i.Claims).ToList();
+        return claims?.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value ?? "user@globomantics.com"; // Default for no authentication
     }
 
     private async Task<HttpResponseData> CreateErrorResponse(HttpRequestData req, HttpStatusCode statusCode, string message)
