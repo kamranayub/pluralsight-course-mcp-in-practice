@@ -17,19 +17,22 @@ public static class DocumentResources
 
     [McpServerResource(UriTemplate = ResourceBenefitPlanDocumentsUri, Name = "Benefit Plan Document List", MimeType = "application/json")]
     [Description("Retrieves a list of available HRM benefit plan documents")]
-    public static async Task<string> DocumentListResource(RequestContext<ReadResourceRequestParams> requestContext, CancellationToken cancellationToken)
+    public static async Task<IEnumerable<ResourceContents>> DocumentListResource(IHrmDocumentService documentService, CancellationToken cancellationToken)
     {
-        var documentService = requestContext.Services?.GetService<IHrmDocumentService>() ?? throw new InvalidOperationException("No HRM Document Service was found");
         var documentInfos = await documentService.GetBenefitPlanDocumentsAsync(cancellationToken);
 
-        return JsonSerializer.Serialize(documentInfos);
+        return documentInfos.Select(info => new TextResourceContents
+        {
+            Text = JsonSerializer.Serialize(info),
+            MimeType = "application/json",
+            Uri = ResourceBenefitPlanDocumentUri.Replace("{documentId}", info.DocumentId),
+        });
     }
 
     [McpServerResource(UriTemplate = ResourceBenefitPlanDocumentUri, Name = "Benefit Plan Document", MimeType = "text/plain")]
     [Description("Retrieves a specific HRM benefit plan document by its resource ID")]
-    public static async Task<ResourceContents> DocumentResourceById(RequestContext<ReadResourceRequestParams> requestContext, string documentId, CancellationToken cancellationToken)
+    public static async Task<ResourceContents> DocumentResourceById(IHrmDocumentService documentService, string documentId, CancellationToken cancellationToken)
     {
-        var documentService = requestContext.Services?.GetService<IHrmDocumentService>() ?? throw new InvalidOperationException("No HRM Document Service was found");
         var downloadResult = await documentService.GetBenefitPlanDocumentContentAsync(documentId, cancellationToken);
 
         if (string.IsNullOrEmpty(downloadResult))

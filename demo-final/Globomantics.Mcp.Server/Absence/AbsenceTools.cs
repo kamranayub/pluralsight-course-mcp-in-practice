@@ -14,14 +14,13 @@ public static class AbsenceTools
 {
     [McpServerTool, Description("Help an employee plan when and whether they can take vacation, leave, or personal days based on their eligibility, benefit plan documentation, and the company calendar")]
     public static async Task<IEnumerable<ContentBlock>> PlanAbsence(
-        RequestContext<CallToolRequestParams> context,
+        IHrmAbsenceApi hrmAbsenceApi,
+        IHrmDocumentService hrmDocumentService,
         string employeeId,
         CancellationToken cancellationToken)
     {
-        var hrmAbsenceApi = context.Services!.GetService<IHrmAbsenceApi>();
-        var hrmDocumentService = context.Services!.GetService<IHrmDocumentService>();
-
-        return await PlanAbsenceAsync(hrmAbsenceApi!, hrmDocumentService!, employeeId, cancellationToken).ToListAsync(cancellationToken);
+        var contentBlocks = await PlanAbsenceAsync(hrmAbsenceApi, hrmDocumentService, employeeId, cancellationToken).ToListAsync(cancellationToken);
+        return contentBlocks;
     }
 
     private static async IAsyncEnumerable<ContentBlock> PlanAbsenceAsync(IHrmAbsenceApi hrmAbsenceApi, IHrmDocumentService hrmDocumentService, string employeeId, [EnumeratorCancellation] CancellationToken cancellationToken)
