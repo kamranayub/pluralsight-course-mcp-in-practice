@@ -17,40 +17,29 @@ public static class DocumentResources
 
     [McpServerResource(UriTemplate = ResourceBenefitPlanDocumentsUri, Name = "Benefit Plan Document List", MimeType = "application/json")]
     [Description("Retrieves a list of available HRM benefit plan documents")]
-    public static async Task<string> DocumentListResource(RequestContext<ReadResourceRequestParams> requestContext)
+    public static async Task<string> DocumentListResource(RequestContext<ReadResourceRequestParams> requestContext, CancellationToken cancellationToken)
     {
-        var blobServiceClient = requestContext.Services?.GetService<BlobServiceClient>() ?? throw new InvalidOperationException("No Azure Blob Service Client was found");
-        var containerClient = blobServiceClient.GetBlobContainerClient("globomanticshrm");
-        var documentBlobs = await containerClient.GetBlobsAsync(traits: Azure.Storage.Blobs.Models.BlobTraits.Metadata).ToListAsync();
-        var documentNames = documentBlobs.Select(b => new
-        {
-            DocumentId = b.Name,
-            Description = b.Metadata.TryGetValue("Description", out string? value) ? value : null
-        }).ToList();
+        var documentService = requestContext.Services?.GetService<IHrmDocumentService>() ?? throw new InvalidOperationException("No HRM Document Service was found");
+        var documentInfos = await documentService.GetBenefitPlanDocumentsAsync(cancellationToken);
 
-        return JsonSerializer.Serialize(documentNames);
+        return JsonSerializer.Serialize(documentInfos);
     }
 
     [McpServerResource(UriTemplate = ResourceBenefitPlanDocumentUri, Name = "Benefit Plan Document", MimeType = "text/plain")]
     [Description("Retrieves a specific HRM benefit plan document by its resource ID")]
-    public static ResourceContents DocumentResourceById(RequestContext<ReadResourceRequestParams> requestContext, string documentId)
+    public static async Task<ResourceContents> DocumentResourceById(RequestContext<ReadResourceRequestParams> requestContext, string documentId, CancellationToken cancellationToken)
     {
-        var blobServiceClient = requestContext.Services?.GetService<BlobServiceClient>() ?? throw new InvalidOperationException("No Azure Blob Service Client was found");
-        var containerClient = blobServiceClient.GetBlobContainerClient("globomanticshrm");
-        var blobClient = containerClient.GetBlobClient(documentId);
+        var documentService = requestContext.Services?.GetService<IHrmDocumentService>() ?? throw new InvalidOperationException("No HRM Document Service was found");
+        var downloadResult = await documentService.GetBenefitPlanDocumentContentAsync(documentId, cancellationToken);
 
-        var exists = blobClient.Exists();
-
-        if (exists.Value == false)
+        if (string.IsNullOrEmpty(downloadResult))
         {
-            throw new McpException("Benefit plan document resource not found", McpErrorCode.InternalError);
+            throw new McpException("Benefit plan document content is empty", McpErrorCode.InternalError);
         }
-
-        var downloadResult = blobClient.DownloadContent();
 
         return new BlobResourceContents
         {
-            Blob = Convert.ToBase64String(downloadResult.Value.Content),
+            Blob = downloadResult,
             MimeType = "application/pdf",
             Uri = $"globomantics://hrm/benefit-documents/{documentId}",
         };

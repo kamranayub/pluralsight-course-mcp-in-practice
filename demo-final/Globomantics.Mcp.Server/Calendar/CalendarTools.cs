@@ -6,39 +6,24 @@ using ModelContextProtocol.Server;
 namespace Globomantics.Mcp.Server.Calendar;
 
 [McpServerToolType]
-public static class Tools
+public static class CalendarTools
 {
-    [McpServerTool, Description("Find information about the Globomantics work calendar for vacation, absence, and time off planning")]
-    public static CallToolResult GetWorkCalendar()
+    [McpServerTool, Description("Get the current Globomantics work calendar")]
+    public static IEnumerable<ContentBlock> GetWorkCalendar()
     {
-        var result = new CallToolResult()
+        yield return new TextContentBlock
         {
-            Content = [
-                new TextContentBlock
-                {
-                    Text = "You can find the Globomantics work calendar below along with the current employee's absence calendar details for planning time off work."
-                },
-                new EmbeddedResourceBlock
-                {
-                    Resource = new TextResourceContents()
-                    {
-                        Uri = CalendarResources.ResourceWorkCalendarUri,
-                        MimeType = "application/json",
-                        Text = CalendarResources.WorkCalendarResource()
-                    }
-                },
-                new EmbeddedResourceBlock
-                {
-                    Resource = new TextResourceContents()
-                    {
-                        Uri = CalendarResources.ResourceEmployeeCalendarUri,
-                        MimeType = "application/json",
-                        Text = CalendarResources.EmployeeCalendarResource()
-                    }
-                }
-            ],
+            Text = "You can find the Globomantics work calendar below for planning time off work."
         };
 
-        return result;
+        yield return new EmbeddedResourceBlock
+        {
+            Resource = new TextResourceContents()
+            {
+                Uri = CalendarResources.ResourceWorkCalendarUri,
+                MimeType = "application/json",
+                Text = CalendarResources.WorkCalendarResource()
+            }
+        };
     }
 }

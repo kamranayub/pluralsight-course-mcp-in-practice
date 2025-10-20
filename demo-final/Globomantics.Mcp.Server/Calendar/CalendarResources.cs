@@ -8,7 +8,6 @@ namespace Globomantics.Mcp.Server.Calendar;
 public static class CalendarResources
 {
     public const string ResourceWorkCalendarUri = "globomantics://hrm/calendars/work";
-    public const string ResourceEmployeeCalendarUri = "globomantics://hrm/calendars/employee";
 
     [McpServerResource(UriTemplate = ResourceWorkCalendarUri, Name = "Work Calendar", MimeType = "application/json")]
     [Description("The current year work calendar")]
@@ -19,25 +18,7 @@ public static class CalendarResources
 
         return JsonSerializer.Serialize(calendar);
     }
-
-    [McpServerResource(UriTemplate = ResourceEmployeeCalendarUri, Name = "Employee Calendar", MimeType = "application/json")]
-    [Description("The current employee absence calendar")]
-    public static string EmployeeCalendarResource()
-    {
-        var calendar = new EmployeeCalendar(
-            [
-                DateTime.Now.AddDays(3).ToString("yyyy-MM-dd"),
-                DateTime.Now.AddDays(4).ToString("yyyy-MM-dd"),
-                DateTime.Now.AddDays(34).ToString("yyyy-MM-dd"),
-                DateTime.Now.AddDays(35).ToString("yyyy-MM-dd"),
-                DateTime.Now.AddDays(36).ToString("yyyy-MM-dd"),
-            ]);
-
-        return JsonSerializer.Serialize(calendar);
-    }
 }
-
-public record EmployeeCalendar(List<string> AbsenceDates);
 
 public record AnnualHolidayCalendar(int Year, Dictionary<string, string> Holidays)
 {

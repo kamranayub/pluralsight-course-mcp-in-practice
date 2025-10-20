@@ -3,6 +3,7 @@ using Azure.Identity;
 using Azure.Storage.Blobs;
 using Globomantics.Mcp.Server;
 using Globomantics.Mcp.Server.Absence;
+using Globomantics.Mcp.Server.Documents;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -27,6 +28,8 @@ builder.Services.AddMcpServer()
 builder.Services.AddSingleton(_ => new BlobServiceClient(
         new Uri("https://psmcpdemo.blob.core.windows.net/"),
         new DefaultAzureCredential()));
+
+builder.Services.AddSingleton<IHrmDocumentService, HrmDocumentService>();
 
 // For stdio, use client credential flow to call HRM API as MCP server identity
 builder.Services.AddSingleton(_ => RestClient.For<IHrmAbsenceApi>("https://globomanticshrmapi-bqhjgyb4e8fxc0gv.eastus-01.azurewebsites.net", async (request, cancellationToken) =>

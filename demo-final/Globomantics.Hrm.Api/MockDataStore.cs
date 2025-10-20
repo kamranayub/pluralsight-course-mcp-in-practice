@@ -51,6 +51,15 @@ public static class MockDataStore
         new AbsenceType("b9876543210fedcba0987654321fedcb", "Personal Day")
     };
 
+    // Benefit plan types
+    public static readonly List<BenefitPlanType> BenefitPlanTypes = new()
+    {
+        new BenefitPlanType("Medical", "Medical Insurance"),
+        new BenefitPlanType("Dental", "Dental Insurance"),
+        new BenefitPlanType("Vision", "Vision Insurance"),
+        new BenefitPlanType("Retirement", "401k Retirement Plan")
+    };
+
     // Benefit plans per employee
     public static readonly Dictionary<string, List<BenefitPlan>> BenefitPlans = new()
     {
@@ -58,25 +67,25 @@ public static class MockDataStore
             "5050",
             new List<BenefitPlan>
             {
-                new BenefitPlan("Health Insurance Premium", "Employee + Family", "2024-01-01", "2024-12-31"),
-                new BenefitPlan("Dental Insurance", "Employee Only", "2024-01-01", "2024-12-31"),
-                new BenefitPlan("401k Plan", "6% Match", "2024-01-01", "2024-12-31")
+                new BenefitPlan("Health Insurance Premium", BenefitPlanTypes[0], "Employee + Family", new DateTime(2024, 1, 1), new DateTime(2024, 12, 31)),
+                new BenefitPlan("Dental Insurance", BenefitPlanTypes[1], "Employee Only", new DateTime(2024, 1, 1), new DateTime(2024, 12, 31)),
+                new BenefitPlan("401k Plan", BenefitPlanTypes[3], "6% Match", new DateTime(2024, 1, 1), new DateTime(2024, 12, 31))
             }
         },
         {
             "5020",
             new List<BenefitPlan>
             {
-                new BenefitPlan("Health Insurance Standard", "Employee + Spouse", "2024-01-01", "2024-12-31"),
-                new BenefitPlan("Vision Insurance", "Employee Only", "2024-01-01", "2024-12-31")
+                new BenefitPlan("Health Insurance Standard", BenefitPlanTypes[0], "Employee + Spouse", new DateTime(2024, 1, 1), new DateTime(2024, 12, 31)),
+                new BenefitPlan("Vision Insurance", BenefitPlanTypes[2], "Employee Only", new DateTime(2024, 1, 1), new DateTime(2024, 12, 31))
             }
         },
         {
             "3050",
             new List<BenefitPlan>
             {
-                new BenefitPlan("Health Insurance Basic", "Employee Only", "2024-01-01", "2024-12-31"),
-                new BenefitPlan("401k Plan", "4% Match", "2024-01-01", "2024-12-31")
+                new BenefitPlan("Health Insurance Basic", BenefitPlanTypes[0], "Employee Only", new DateTime(2024, 1, 1), new DateTime(2024, 12, 31)),
+                new BenefitPlan("401k Plan", BenefitPlanTypes[3], "4% Match", new DateTime(2024, 1, 1), new DateTime(2024, 12, 31))
             }
         }
     };

@@ -17,11 +17,17 @@ public record AbsenceType(
     string Name
 );
 
+public record BenefitPlanType(
+    string Id,
+    string Name
+);
+
 public record BenefitPlan(
     string PlanName,
+    BenefitPlanType PlanType,
     string Coverage,
-    string StartDate,
-    string EndDate
+    DateTime StartDate,
+    DateTime EndDate
 );
 
 public record TimeOffRequest(
