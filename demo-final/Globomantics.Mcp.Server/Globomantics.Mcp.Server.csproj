@@ -13,6 +13,7 @@
     <PackageReference Include="Azure.Storage.Blobs" Version="12.26.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.9" />
     <PackageReference Include="ModelContextProtocol" Version="0.4.0-preview.1" />
+    <PackageReference Include="RestEase" Version="1.6.4" />
   </ItemGroup>
 
 </Project>

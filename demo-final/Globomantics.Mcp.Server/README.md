@@ -25,6 +25,31 @@ For accessing Blob Containers, the demo uses Microsoft Entra ID authentication, 
 
 For the demo user to access Azure AI Search, the roles **Azure Search Service Reader** is required and the AI Search service needs RBAC-based authentication enabled.
 
+### Auth
+
+#### STDIO transport
+
+When using the `stdio` transport, authentication options are limited. Enterprise scenarios that rely on **On-Behalf-Of (OBO)** flows require interactive user consent, which is only available through OAuth—supported by the **Streamable HTTP** transport.
+
+For `stdio`, you can instead use **app-only authentication**, where the MCP server authenticates to an external API with its own client ID and secret. In this model, the server connects as *itself*, not as an individual user. This means endpoints that depend on a signed-in user won’t work until the demo is upgraded to the Streamable HTTP transport later in the course.
+
+See [Native client app registration](https://learn.microsoft.com/en-us/azure/app-service/configure-authentication-provider-aad?tabs=workforce-configuration#native-client-application) for detailed setup steps.
+
+> [!IMPORTANT]
+> The official documentation omits a key step:
+> You must add your MCP app registration’s **Application (client) ID** to the **Allowed client applications** list in the Azure App Service Authentication settings.
+> If this list is populated, Easy Auth blocks all callers that aren’t explicitly listed—including your MCP app—resulting in a 403 Forbidden response.
+
+#### Streamable HTTP transport
+
+In the final demo, the MCP server uses a **native OAuth2 OBO flow** through Azure App Service Easy Auth and Entra ID. The server requests tokens **on behalf of the signed-in user** (the MCP client), effectively forwarding their credentials to the downstream HRM API in a standard native-app authorization flow.
+
+To configure this, create an **App Registration** for the MCP server and grant it **delegated API permissions** to the HRM API (`user_impersonation` scope).
+
+> [!TIP]
+> Make sure you own both the MCP server and HRM API app registrations.
+> Otherwise, the HRM API’s `user_impersonation` delegated permission won’t appear when you edit the MCP app registration.
+
 ## Examples
 
 ### Ping Server
