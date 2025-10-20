@@ -59,6 +59,7 @@ public record DocumentInfo(string DocumentId, string Title, string? Description,
 /// </summary>
 public enum PlanDocumentCategory
 {
+    Absence,
     Medical,
     Dental,
     Vision,
