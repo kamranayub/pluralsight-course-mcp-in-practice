@@ -51,7 +51,7 @@ public class HrmFunctions
     [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.Unauthorized, Description = "Unauthorized - Invalid or missing Bearer token.")]
     [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.NotFound, Description = "Worker or absence types not found.")]
     [Function("GetEligibleAbsenceTypes")]
-    public async Task<HttpResponseData> GetEligibleAbsenceTypes([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "api/absenceManagement/v1/tenant/workers/Employee_ID={employeeId}/eligibleAbsenceTypes")] HttpRequestData req, string employeeId)
+    public async Task<HttpResponseData> GetEligibleAbsenceTypes([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "absenceManagement/v1/tenant/workers/Employee_ID={employeeId}/eligibleAbsenceTypes")] HttpRequestData req, string employeeId)
     {
         _logger.LogInformation($"Getting eligible absence types for employee {employeeId}");
 
@@ -82,7 +82,7 @@ public class HrmFunctions
     [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.Unauthorized, Description = "Unauthorized - Invalid or missing Bearer token.")]
     [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.NotFound, Description = "Worker not found.")]
     [Function("GetWorkerById")]
-    public async Task<HttpResponseData> GetWorkerById([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "api/absenceManagement/v1/tenant/workers/Employee_ID={employeeId}")] HttpRequestData req, string employeeId)
+    public async Task<HttpResponseData> GetWorkerById([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "absenceManagement/v1/tenant/workers/Employee_ID={employeeId}")] HttpRequestData req, string employeeId)
     {
         _logger.LogInformation($"Getting worker details for employee {employeeId}");
 
@@ -104,7 +104,7 @@ public class HrmFunctions
     [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.Unauthorized, Description = "Unauthorized - Invalid or missing Bearer token.")]
     [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.NotFound, Description = "Worker not found.")]
     [Function("RequestTimeOff")]
-    public async Task<HttpResponseData> RequestTimeOff([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "api/absenceManagement/v1/tenant/workers/Employee_ID={employeeId}/requestTimeOff")] HttpRequestData req, string employeeId)
+    public async Task<HttpResponseData> RequestTimeOff([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "absenceManagement/v1/tenant/workers/Employee_ID={employeeId}/requestTimeOff")] HttpRequestData req, string employeeId)
     {
         _logger.LogInformation($"Requesting time off for employee {employeeId}");
 
