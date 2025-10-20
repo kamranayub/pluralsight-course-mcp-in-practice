@@ -1,3 +1,4 @@
+using Globomantics.Mcp.Server.Documents;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 

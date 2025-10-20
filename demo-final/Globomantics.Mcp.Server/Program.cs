@@ -9,7 +9,6 @@ using Microsoft.Extensions.Logging;
 using RestEase;
 
 var builder = Host.CreateEmptyApplicationBuilder(settings: null);
-var azureCredential = new DefaultAzureCredential();
 
 builder.Logging.AddConsole(consoleLogOptions =>
 {
@@ -22,11 +21,12 @@ builder.Services.AddMcpServer()
     .WithResourcesFromAssembly()
     .WithToolsFromAssembly()
     .WithPromptsFromAssembly()
-    .WithCompleteHandler(Completions.CompleteHandler);
+    .WithCompleteHandler(Completions.CompleteHandler)
+    .AddListPromptsFilter(Filters.ListPromptsFilter);
 
 builder.Services.AddSingleton(_ => new BlobServiceClient(
         new Uri("https://psmcpdemo.blob.core.windows.net/"),
-        azureCredential));
+        new DefaultAzureCredential()));
 
 // For stdio, use client credential flow to call HRM API as MCP server identity
 builder.Services.AddSingleton(_ => RestClient.For<IHrmAbsenceApi>("https://globomanticshrmapi-bqhjgyb4e8fxc0gv.eastus-01.azurewebsites.net", async (request, cancellationToken) =>
