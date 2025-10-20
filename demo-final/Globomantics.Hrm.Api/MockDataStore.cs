@@ -67,25 +67,25 @@ public static class MockDataStore
             "5050",
             new List<BenefitPlan>
             {
-                new BenefitPlan("Health Insurance Premium", BenefitPlanTypes[0], "Employee + Family", new DateTime(2024, 1, 1), new DateTime(2024, 12, 31)),
-                new BenefitPlan("Dental Insurance", BenefitPlanTypes[1], "Employee Only", new DateTime(2024, 1, 1), new DateTime(2024, 12, 31)),
-                new BenefitPlan("401k Plan", BenefitPlanTypes[3], "6% Match", new DateTime(2024, 1, 1), new DateTime(2024, 12, 31))
+                new BenefitPlan("Health Insurance Premium", BenefitPlanTypes[0], "Employee + Family", new DateTime(DateTime.Now.Year, 1, 1), new DateTime(DateTime.Now.Year, 12, 31)),
+                new BenefitPlan("Dental Insurance", BenefitPlanTypes[1], "Employee Only", new DateTime(DateTime.Now.Year, 1, 1), new DateTime(DateTime.Now.Year, 12, 31)),
+                new BenefitPlan("401k Plan", BenefitPlanTypes[3], "6% Match", new DateTime(DateTime.Now.Year, 1, 1), new DateTime(DateTime.Now.Year, 12, 31))
             }
         },
         {
             "5020",
             new List<BenefitPlan>
             {
-                new BenefitPlan("Health Insurance Standard", BenefitPlanTypes[0], "Employee + Spouse", new DateTime(2024, 1, 1), new DateTime(2024, 12, 31)),
-                new BenefitPlan("Vision Insurance", BenefitPlanTypes[2], "Employee Only", new DateTime(2024, 1, 1), new DateTime(2024, 12, 31))
+                new BenefitPlan("Health Insurance Standard", BenefitPlanTypes[0], "Employee + Spouse", new DateTime(DateTime.Now.Year, 1, 1), new DateTime(DateTime.Now.Year, 12, 31)),
+                new BenefitPlan("Vision Insurance", BenefitPlanTypes[2], "Employee Only", new DateTime(DateTime.Now.Year, 1, 1), new DateTime(DateTime.Now.Year, 12, 31))
             }
         },
         {
             "3050",
             new List<BenefitPlan>
             {
-                new BenefitPlan("Health Insurance Basic", BenefitPlanTypes[0], "Employee Only", new DateTime(2024, 1, 1), new DateTime(2024, 12, 31)),
-                new BenefitPlan("401k Plan", BenefitPlanTypes[3], "4% Match", new DateTime(2024, 1, 1), new DateTime(2024, 12, 31))
+                new BenefitPlan("Health Insurance Basic", BenefitPlanTypes[0], "Employee Only", new DateTime(DateTime.Now.Year, 1, 1), new DateTime(DateTime.Now.Year, 12, 31)),
+                new BenefitPlan("401k Plan", BenefitPlanTypes[3], "4% Match", new DateTime(DateTime.Now.Year, 1, 1), new DateTime(DateTime.Now.Year, 12, 31))
             }
         }
     };
