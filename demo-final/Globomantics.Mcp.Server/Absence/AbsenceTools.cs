@@ -4,6 +4,7 @@ using System.Text.Json;
 using Globomantics.Mcp.Server.Calendar;
 using Globomantics.Mcp.Server.Documents;
 using Microsoft.Extensions.DependencyInjection;
+using ModelContextProtocol;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
@@ -25,14 +26,22 @@ public static class AbsenceTools
 
     private static async IAsyncEnumerable<ContentBlock> PlanAbsenceAsync(IHrmAbsenceApi hrmAbsenceApi, IHrmDocumentService hrmDocumentService, string employeeId, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
+        var employeeDetails = await hrmAbsenceApi.GetWorkerByIdAsync(employeeId, cancellationToken);
         var eligibleAbsenceTypes = await hrmAbsenceApi.GetEligibleAbsenceTypesAsync(employeeId, "not_used", cancellationToken);
     
         yield return new TextContentBlock
         {
-            Text = $"Here are the employee's eligible absence types: {JsonSerializer.Serialize(eligibleAbsenceTypes)}"
+            Text = $"Here are the employee's eligible absence types: {JsonSerializer.Serialize(eligibleAbsenceTypes, McpJsonUtilities.DefaultOptions)}"
         };
 
-        foreach (var block in CalendarTools.GetWorkCalendar())
+        var workLocation = employeeDetails.HQLocation switch
+        {
+            "US" => WorkLocation.UnitedStates,
+            "IN" => WorkLocation.India,
+            _ => WorkLocation.UnitedStates
+        };
+        
+        foreach (var block in CalendarTools.GetWorkCalendar([DateTime.UtcNow.Year, DateTime.UtcNow.Year + 1], workLocation))
         {
             yield return block;
         }
@@ -52,7 +61,7 @@ public static class AbsenceTools
 
         yield return new TextContentBlock
         {
-            Text = $"Here are the relevant benefit plan document resource links the employee is enrolled in that you can lookup on-demand:"
+            Text = $"Here are the relevant benefit plan document resource links the employee is enrolled in that you can refer to directly for official policies:"
         };
 
         foreach (var plan in currentlyEffectivePlans)

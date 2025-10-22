@@ -18,6 +18,7 @@ public static class MockDataStore
             new Worker(
                 "5050",
                 new WorkerName("PS", "User"),
+                "IN",
                 "Software Engineer",
                 "employee@globomantics.com"
             )
@@ -27,6 +28,7 @@ public static class MockDataStore
             new Worker(
                 "5020",
                 new WorkerName("Kamran", "Ayub"),
+                "US",
                 "CEO",
                 "ceo@globomantics.com"
             )
@@ -36,6 +38,7 @@ public static class MockDataStore
             new Worker(
                 "3050",
                 new WorkerName("Bob", "Johnson"),
+                "US",
                 "Senior Developer",
                 "bob.johnson@globomantics.com"
             )

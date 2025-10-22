@@ -3,6 +3,7 @@ namespace Globomantics.Hrm.Api;
 public record Worker(
     string Id,
     WorkerName Name,
+    string HQLocation,
     string Position,
     string Email
 );

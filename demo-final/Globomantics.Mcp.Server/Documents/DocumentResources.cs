@@ -23,7 +23,7 @@ public static class DocumentResources
 
         return documentInfos.Select(info => new TextResourceContents
         {
-            Text = JsonSerializer.Serialize(info),
+            Text = JsonSerializer.Serialize(info, McpJsonUtilities.DefaultOptions),
             MimeType = "application/json",
             Uri = ResourceBenefitPlanDocumentUri.Replace("{documentId}", info.DocumentId),
         });

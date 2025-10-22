@@ -7,6 +7,7 @@ using Globomantics.Mcp.Server.Documents;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using RestEase;
 
 var builder = Host.CreateEmptyApplicationBuilder(settings: null);

@@ -13,7 +13,7 @@ public static class CalendarPrompts
     }
 
     [McpServerPrompt(Title = "Suggest Time Off Work (Smart)")]
-    public static IEnumerable<PromptMessage> SuggestTimeOffPromptSmart()
+    public static IEnumerable<PromptMessage> SuggestTimeOffPromptSmart(int year, WorkLocation location)
     {
         yield return new PromptMessage()
         {
@@ -29,8 +29,8 @@ public static class CalendarPrompts
             Content = new EmbeddedResourceBlock() {
                 Resource = new TextResourceContents() {
                     MimeType = "application/json",
-                    Uri = CalendarResources.ResourceWorkCalendarUri,
-                    Text = CalendarResources.WorkCalendarResource()
+                    Uri = CalendarResources.ResourceWorkByLocationCalendarUri.Replace("{year}", year.ToString()).Replace("{location}", location.ToString()),
+                    Text = CalendarResources.WorkCalendarByLocationResource(year, location)
                 },
             }
         };

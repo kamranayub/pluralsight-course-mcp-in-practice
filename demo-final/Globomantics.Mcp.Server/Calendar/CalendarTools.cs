@@ -9,21 +9,24 @@ namespace Globomantics.Mcp.Server.Calendar;
 public static class CalendarTools
 {
     [McpServerTool, Description("Get the current Globomantics work calendar")]
-    public static IEnumerable<ContentBlock> GetWorkCalendar()
+    public static IEnumerable<ContentBlock> GetWorkCalendar(int[] calendarYears, WorkLocation? workLocation)
     {
         yield return new TextContentBlock
         {
-            Text = "You can find the Globomantics work calendar below for planning time off work."
+            Text = "You can find the Globomantics work calendar(s) below for planning time off work."
         };
 
-        yield return new EmbeddedResourceBlock
+        foreach (var year in calendarYears)
         {
-            Resource = new TextResourceContents()
+            yield return new EmbeddedResourceBlock
             {
-                Uri = CalendarResources.ResourceWorkCalendarUri,
-                MimeType = "application/json",
-                Text = CalendarResources.WorkCalendarResource()
-            }
-        };
+                Resource = new TextResourceContents()
+                {
+                    Uri = CalendarResources.ResourceWorkByLocationCalendarUri,
+                    MimeType = "application/json",
+                    Text = CalendarResources.WorkCalendarByLocationResource(year, workLocation ?? WorkLocation.UnitedStates)
+                }
+            };
+        }
     }
 }
