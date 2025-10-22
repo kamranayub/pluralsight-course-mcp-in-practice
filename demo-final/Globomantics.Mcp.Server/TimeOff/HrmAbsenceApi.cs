@@ -1,8 +1,7 @@
-using Azure.Core;
 using Globomantics.Hrm.Api;
 using RestEase;
 
-namespace Globomantics.Mcp.Server.Absence;
+namespace Globomantics.Mcp.Server.TimeOff;
 
 public interface IHrmAbsenceApi
 {
@@ -20,4 +19,7 @@ public interface IHrmAbsenceApi
 
     [Get("api/service/customreport2/tenant/GPT_Worker_Benefit_Data")]
     Task<BenefitPlansResponse> GetWorkerBenefitPlansAsync([Query(Name = "Worker!Employee_ID")] string employeeId, [Query] string format, CancellationToken cancellationToken);
+
+    [Get("api/service/customreport2/tenant/GPT_Worker_Planned_Time_Off")]
+    Task<PlannedTimeOffResponse> GetWorkerPlannedTimeOffAsync([Query(Name = "Worker!Employee_ID")] string employeeId, [Query] string format, CancellationToken cancellationToken);
 }

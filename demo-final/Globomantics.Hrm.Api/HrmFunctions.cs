@@ -184,6 +184,42 @@ public class HrmFunctions
         return response;
     }
 
+    [OpenApiOperation(operationId: "getWorkerPlannedTimeOff", Summary = "Retrieve worker planned time off by Employee ID.", Description = "Fetches the planned time off for the worker using their Employee ID.")]
+    [OpenApiParameter(name: "Worker!Employee_ID", In = ParameterLocation.Query, Required = true, Type = typeof(string), Description = "The Employee ID of the worker.")]
+    [OpenApiParameter(name: "format", In = ParameterLocation.Query, Required = true, Type = typeof(string), Description = "The format of the response (e.g., `json`).")]
+    [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(object),
+            Description = "A JSON array of the worker's planned time off.")]
+    [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.Unauthorized, Description = "Unauthorized - Invalid or missing Bearer token.")]
+    [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.NotFound, Description = "Worker or planned time off not found.")]
+    [Function("GetWorkerPlannedTimeOff")]
+    public async Task<HttpResponseData> GetWorkerPlannedTimeOff([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "service/customreport2/tenant/GPT_Worker_Planned_Time_Off")] HttpRequestData req)
+    {
+        _logger.LogInformation("Getting worker planned time off");
+
+        var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+        var employeeId = query["Worker!Employee_ID"];
+        var format = query["format"];
+
+        if (string.IsNullOrEmpty(employeeId))
+        {
+            return await CreateErrorResponse(req, HttpStatusCode.BadRequest, "Employee ID required");
+        }
+
+        if (format != "json")
+        {
+            return await CreateErrorResponse(req, HttpStatusCode.BadRequest, "Only JSON format supported");
+        }
+
+        if (!MockDataStore.PlannedTimeOff.TryGetValue(employeeId, out var plannedTimeOff))
+        {
+            return await CreateErrorResponse(req, HttpStatusCode.NotFound, "Planned time off not found");
+        }
+
+        var response = req.CreateResponse(HttpStatusCode.OK);
+        await response.WriteAsJsonAsync(new PlannedTimeOffResponse(plannedTimeOff));
+        return response;
+    }
+
     private string GetUserEmailClaimFromRequest(HttpRequestData req)
     {
         var claimsPrincipal = ClaimsPrincipalParser.Parse(req);

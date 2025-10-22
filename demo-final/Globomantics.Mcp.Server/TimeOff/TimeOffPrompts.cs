@@ -4,7 +4,7 @@ using ModelContextProtocol.Server;
 namespace Globomantics.Mcp.Server.Calendar;
 
 [McpServerPromptType]
-public static class CalendarPrompts
+public static class TimeOffPrompts
 {
     [McpServerPrompt(Title = "Suggest Time Off Work (Basic)")]
     public static string SuggestTimeOffPrompt()

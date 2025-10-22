@@ -40,11 +40,11 @@ public record TimeOffDay(
     string Date,
     string End,
     double DailyQuantity,
-    TimeOffType TimeOffType
+    AbsenceType TimeOffType
 );
 
-public record TimeOffType(
-    string Id
+public record PlannedTimeOff(
+    List<TimeOffDay> PlannedDays
 );
 
 public record EmployeeIdResponse(
@@ -57,6 +57,10 @@ public record AbsenceTypesResponse(
 
 public record BenefitPlansResponse(
     List<BenefitPlan> BenefitPlans
+);
+
+public record PlannedTimeOffResponse(
+    PlannedTimeOff PlannedTimeOff
 );
 
 public record TimeOffResponse(

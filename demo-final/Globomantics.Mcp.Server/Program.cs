@@ -2,12 +2,11 @@
 using Azure.Identity;
 using Azure.Storage.Blobs;
 using Globomantics.Mcp.Server;
-using Globomantics.Mcp.Server.Absence;
+using Globomantics.Mcp.Server.TimeOff;
 using Globomantics.Mcp.Server.Documents;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using RestEase;
 
 var builder = Host.CreateEmptyApplicationBuilder(settings: null);
@@ -21,6 +20,7 @@ builder.Logging.AddConsole(consoleLogOptions =>
 builder.Services.AddMcpServer()
     .WithStdioServerTransport()
     .WithResourcesFromAssembly()
+    // .WithTools(typeof(EchoTool))
     .WithToolsFromAssembly()
     .WithPromptsFromAssembly()
     .WithCompleteHandler(Completions.CompleteHandler)

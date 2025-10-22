@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Globomantics.Mcp.Server.TimeOff;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
 
@@ -19,6 +20,17 @@ public static class CalendarResources
         var inCalendar = AnnualHolidayCalendar.CreateForYear(DateTime.Now.Year, WorkLocation.India);
 
         return JsonSerializer.Serialize(new { US = usCalendar, IN = inCalendar }, McpJsonUtilities.DefaultOptions);
+    }
+
+    public const string ResourceEmployeeCalendarUri = "globomantics://hrm/calendars/employee/{employeeId}";
+
+    [McpServerResource(UriTemplate = ResourceEmployeeCalendarUri, Name = "Employee Calendar", MimeType = "application/json")]
+    [Description("The current year employee time-off calendar")]
+    public static async Task<string> EmployeeCalendarResource(string employeeId, IHrmAbsenceApi hrmAbsenceApi, CancellationToken cancellationToken)
+    {
+        var employeeTimeOff = await hrmAbsenceApi.GetWorkerPlannedTimeOffAsync(employeeId, "json", cancellationToken);
+
+        return JsonSerializer.Serialize(employeeTimeOff, McpJsonUtilities.DefaultOptions);
     }
 
     public const string ResourceWorkByLocationCalendarUri = "globomantics://hrm/calendars/work/{year}/{location}";

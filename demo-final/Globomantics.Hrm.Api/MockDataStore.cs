@@ -93,6 +93,37 @@ public static class MockDataStore
         }
     };
 
+    // Absence time off details per employee
+    public static readonly Dictionary<string, PlannedTimeOff> PlannedTimeOff = new()
+    {
+        {
+            "5050",
+            new PlannedTimeOff(
+                [
+                    new TimeOffDay("09:00", new DateTime(DateTime.UtcNow.Year, 7, 15).ToString("yyyy-MM-dd"), "17:00", 1.0, AbsenceTypes[0]),
+                    new TimeOffDay("09:00", new DateTime(DateTime.UtcNow.Year, 12, 24).ToString("yyyy-MM-dd"), "13:00", 0.5, AbsenceTypes[1])
+                ]
+            )
+        },
+        {
+            "5020",
+            new PlannedTimeOff(
+                [
+                    new TimeOffDay("09:00", new DateTime(DateTime.UtcNow.Year, 11, 25).ToString("yyyy-MM-dd"), "17:00", 1.0, AbsenceTypes[2]),
+                    new TimeOffDay("09:00", new DateTime(DateTime.UtcNow.Year, 12, 31).ToString("yyyy-MM-dd"), "17:00", 1.0, AbsenceTypes[3])
+                ]
+            )
+        },
+        {
+            "3050",
+            new PlannedTimeOff(
+                [
+                    new TimeOffDay("09:00", new DateTime(DateTime.UtcNow.Year, 08, 05).ToString("yyyy-MM-dd"), "17:00", 1.0, AbsenceTypes[1])
+                ]
+            )
+        }
+    };
+
     // In-memory storage for time off requests
     public static readonly List<TimeOffRequest> TimeOffRequests = new();
 }
