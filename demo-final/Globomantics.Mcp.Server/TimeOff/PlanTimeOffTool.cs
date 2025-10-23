@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using Azure.Search.Documents;
+using Azure.Search.Documents.Models;
 using Globomantics.Mcp.Server.Calendar;
 using Globomantics.Mcp.Server.Documents;
 using ModelContextProtocol;
@@ -14,12 +16,15 @@ public class PlanTimeOffTool
 {
     private readonly IHrmAbsenceApi hrmAbsenceApi;
     private readonly IHrmDocumentService hrmDocumentService;
+    private readonly SearchClient searchClient;
 
     public PlanTimeOffTool(IHrmAbsenceApi hrmAbsenceApi,
-        IHrmDocumentService hrmDocumentService)
+        IHrmDocumentService hrmDocumentService,
+        SearchClient searchClient)
     {
         this.hrmAbsenceApi = hrmAbsenceApi;
         this.hrmDocumentService = hrmDocumentService;
+        this.searchClient = searchClient;
     }
     
     [McpServerTool, Description("Help an employee plan when and whether they can take vacation, leave, or personal days based on their eligibility, benefit plan documentation, and the company calendar")]
@@ -34,23 +39,22 @@ public class PlanTimeOffTool
     private async IAsyncEnumerable<ContentBlock> PlanTimeOffAsync(string employeeId, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var employeeDetails = await hrmAbsenceApi.GetWorkerByIdAsync(employeeId, cancellationToken);
+
+        yield return new TextContentBlock
+        {
+            Text = $"Employee details: {JsonSerializer.Serialize(employeeDetails, McpJsonUtilities.DefaultOptions)}"
+        };
+
         var eligibleAbsenceTypes = await hrmAbsenceApi.GetEligibleAbsenceTypesAsync(employeeId, "not_used", cancellationToken);
 
         yield return new TextContentBlock
         {
-            Text = $"Here are the employee's eligible absence types: {JsonSerializer.Serialize(eligibleAbsenceTypes, McpJsonUtilities.DefaultOptions)}"
-        };
-
-        var workLocation = employeeDetails.HQLocation switch
-        {
-            "US" => WorkLocation.UnitedStates,
-            "IN" => WorkLocation.India,
-            _ => WorkLocation.UnitedStates
+            Text = $"Eligible absence types: {JsonSerializer.Serialize(eligibleAbsenceTypes, McpJsonUtilities.DefaultOptions)}"
         };
 
         yield return new TextContentBlock
         {
-            Text = "You can find the employee's planned time off below:"
+            Text = "Currently planned time off:"
         };
         yield return new EmbeddedResourceBlock
         {
@@ -62,8 +66,23 @@ public class PlanTimeOffTool
             }
         };
 
+        await foreach (var block in ProvideRelevantPlanDocumentLinks(employeeId, cancellationToken))
+        {
+            yield return block;
+        }
+
+        await foreach (var block in ProvideRelevantPlanExcerptsAsync(
+            queryText: $"time off policies for {string.Join(", ", eligibleAbsenceTypes)}",
+            k: 3,
+            cancellationToken))
+        {
+            yield return block;
+        }
+    }
+
+    private async IAsyncEnumerable<ContentBlock> ProvideRelevantPlanDocumentLinks(string employeeId, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
         var employeeBenefitPlans = await hrmAbsenceApi.GetWorkerBenefitPlansAsync(employeeId, "json", cancellationToken);
-        var benefitPlanDocuments = await hrmDocumentService.GetBenefitPlanDocumentsAsync(cancellationToken);
         var currentlyEffectivePlans = employeeBenefitPlans.BenefitPlans.Where(p => DateTime.UtcNow >= p.StartDate && p.EndDate >= DateTime.UtcNow).ToList();
 
         if (currentlyEffectivePlans.Count == 0)
@@ -80,6 +99,7 @@ public class PlanTimeOffTool
             Text = $"Here are the relevant benefit plan document resource links the employee is enrolled in that you can refer to directly for official policies:"
         };
 
+        var benefitPlanDocuments = await hrmDocumentService.GetBenefitPlanDocumentsAsync(cancellationToken);
         foreach (var plan in currentlyEffectivePlans)
         {
             var matchingDocument = benefitPlanDocuments.Find(doc => doc.Category?.ToString() == plan.PlanType.Id);
@@ -95,4 +115,44 @@ public class PlanTimeOffTool
         }
     }
     
+    private async IAsyncEnumerable<ContentBlock> ProvideRelevantPlanExcerptsAsync(string queryText, int k, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        yield return new TextContentBlock
+        {
+            Text = "Here are some relevant time off policy document excerpts that may help answer questions about planning time off work:"
+        };
+
+        var searchOptions = new SearchOptions
+        {
+            Filter = "",
+            Size = k,
+            Select = { "title", "chunk_id", "chunk" },
+            IncludeTotalCount = true,
+            VectorSearch = new()
+            {
+                Queries =
+                {
+                    new VectorizableTextQuery(text: queryText)
+                    {
+                        KNearestNeighborsCount = k,
+                        Fields = {"text_vector"},
+                        Exhaustive = false
+                    }
+                }
+            }
+        };
+
+        var searchResults = await searchClient.SearchAsync<SearchDocument>(null, searchOptions, cancellationToken: cancellationToken);
+
+        if (searchResults.HasValue)
+        {
+            await foreach (var result in searchResults.Value.GetResultsAsync())
+            {
+                yield return new TextContentBlock
+                {
+                    Text = $"Document ID: {result.Document["title"]}\n---\n{result.Document["chunk"]}"
+                };
+            }
+        }
+    }
 }

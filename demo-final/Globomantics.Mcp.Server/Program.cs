@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using RestEase;
+using Azure.Search.Documents;
 
 var builder = Host.CreateEmptyApplicationBuilder(settings: null);
 
@@ -28,6 +29,11 @@ builder.Services.AddMcpServer()
 
 builder.Services.AddSingleton(_ => new BlobServiceClient(
         new Uri("https://psmcpdemo.blob.core.windows.net/"),
+        new DefaultAzureCredential()));
+
+builder.Services.AddSingleton(_ => new SearchClient(
+        new Uri("https://psdemo.search.windows.net"),
+        "rag-globomantics-hrm",
         new DefaultAzureCredential()));
 
 builder.Services.AddSingleton<IHrmDocumentService, HrmDocumentService>();
