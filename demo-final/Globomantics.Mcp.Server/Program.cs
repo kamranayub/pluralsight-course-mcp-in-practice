@@ -1,17 +1,16 @@
-﻿using Azure.Core;
+﻿using RestEase;
+using Azure.Core;
 using Azure.Identity;
 using Azure.Storage.Blobs;
-using Globomantics.Mcp.Server;
 using Globomantics.Mcp.Server.TimeOff;
 using Globomantics.Mcp.Server.Documents;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using RestEase;
 using Azure.Search.Documents;
 using Microsoft.Extensions.Configuration;
+using Microsoft.AspNetCore.Builder;
 
-var builder = Host.CreateEmptyApplicationBuilder(settings: null);
+var builder = WebApplication.CreateBuilder(args);
 
 // Configure user secrets and env vars for local development
 builder.Configuration
@@ -26,9 +25,8 @@ builder.Logging.AddConsole(consoleLogOptions =>
 
 // Configure MCP server
 builder.Services.AddMcpServer()
-    .WithStdioServerTransport()
+    .WithHttpTransport()
     .WithResourcesFromAssembly()
-    // .WithTools(typeof(EchoTool))
     .WithToolsFromAssembly()
     .WithPromptsFromAssembly();
 
@@ -61,5 +59,7 @@ builder.Services.AddSingleton(_ => RestClient.For<IHrmAbsenceApi>("https://globo
             }));
 
 var app = builder.Build();
+
+app.MapMcp();
 
 await app.RunAsync();
