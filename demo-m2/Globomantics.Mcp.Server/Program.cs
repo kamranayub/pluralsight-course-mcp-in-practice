@@ -43,22 +43,24 @@ builder.Services.AddSingleton(_ => new SearchClient(
         "rag-globomantics-hrm",
         azureCredential));
 
-builder.Services.AddSingleton<IHrmDocumentService, HrmDocumentService>();
+builder.Services.AddSingleton(_ =>
+{
+    // For stdio, use client credential flow to call HRM API as MCP server identity
+    var tenantId = builder.Configuration["AZURE_TENANT_ID"];
+    var mcpClientId = builder.Configuration["MCP_SERVER_AAD_CLIENT_ID"];
+    var mcpClientSecret = builder.Configuration["MCP_SERVER_AAD_CLIENT_SECRET"];
+    var hrmAppId = builder.Configuration["HRM_API_AAD_CLIENT_ID"];
+    var hrmClientSecretCredential = new ClientSecretCredential(tenantId, mcpClientId, mcpClientSecret);
 
-// For stdio, use client credential flow to call HRM API as MCP server identity
-builder.Services.AddSingleton(_ => RestClient.For<IHrmAbsenceApi>("https://globomanticshrmapi-bqhjgyb4e8fxc0gv.eastus-01.azurewebsites.net", async (request, cancellationToken) =>
+    return RestClient.For<IHrmAbsenceApi>("https://globomanticshrmapi-bqhjgyb4e8fxc0gv.eastus-01.azurewebsites.net", async (request, cancellationToken) =>
             {
-                var tenantId = builder.Configuration["AZURE_TENANT_ID"];
-                var mcpClientId = builder.Configuration["MCP_SERVER_AAD_CLIENT_ID"];
-                var mcpClientSecret = builder.Configuration["MCP_SERVER_AAD_CLIENT_SECRET"];
-                var hrmAppId = builder.Configuration["HRM_API_AAD_CLIENT_ID"];
-                var scopes = new[] { $"api://{hrmAppId}/.default" };
-                var credential = new ClientSecretCredential(tenantId, mcpClientId, mcpClientSecret);
-
-                var token = await credential.GetTokenAsync(new TokenRequestContext(scopes), cancellationToken);
-
+                var token = await hrmClientSecretCredential.GetTokenAsync(
+                    new TokenRequestContext([$"api://{hrmAppId}/.default"]), cancellationToken);
                 request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Token);
-            }));
+            });
+});
+
+builder.Services.AddSingleton<IHrmDocumentService, HrmDocumentService>();
 
 var app = builder.Build();
 
