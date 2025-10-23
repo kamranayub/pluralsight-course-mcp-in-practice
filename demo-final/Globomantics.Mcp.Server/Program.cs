@@ -30,9 +30,7 @@ builder.Services.AddMcpServer()
     .WithResourcesFromAssembly()
     // .WithTools(typeof(EchoTool))
     .WithToolsFromAssembly()
-    .WithPromptsFromAssembly()
-    .WithCompleteHandler(Completions.CompleteHandler)
-    .AddListPromptsFilter(Filters.ListPromptsFilter);
+    .WithPromptsFromAssembly();
 
 // Configure Azure clients and services
 var azureCredential = new DefaultAzureCredential();
