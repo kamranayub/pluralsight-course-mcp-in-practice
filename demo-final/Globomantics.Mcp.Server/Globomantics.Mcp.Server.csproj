@@ -22,8 +22,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Globomantics.Hrm.Api\Globomantics.Hrm.Api.csproj" />
-  </ItemGroup>
+  <Compile Include="..\Globomantics.Hrm.Api\Models.cs">
+    <Link>Models.cs</Link>
+  </Compile>
+</ItemGroup>
+
 
   <ItemGroup>
     <Content Include=".azurefunctions\**">
