@@ -25,7 +25,11 @@ builder.Logging.AddConsole(consoleLogOptions =>
 
 // Configure MCP server
 builder.Services.AddMcpServer()
-    .WithHttpTransport()
+    .WithHttpTransport(options =>
+    {
+        // In the Advanced MCP course, we will discuss stateful vs stateless MCP servers
+        options.Stateless = true;
+    })
     .WithResourcesFromAssembly()
     .WithToolsFromAssembly()
     .WithPromptsFromAssembly();
