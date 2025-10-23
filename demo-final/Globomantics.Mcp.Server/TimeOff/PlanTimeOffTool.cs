@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Azure.Search.Documents;
 using Azure.Search.Documents.Models;
+using Globomantics.Hrm.Api;
 using Globomantics.Mcp.Server.Calendar;
 using Globomantics.Mcp.Server.Documents;
 using ModelContextProtocol;
@@ -10,6 +11,15 @@ using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
 namespace Globomantics.Mcp.Server.TimeOff;
+
+public enum TimeOffPlanKind
+{
+    Vacation,
+    MedicalLeave,
+    ParentalLeaveOrFMLA,
+    Sabbatical,
+    PersonalLeaveOfAbsence
+}
 
 [McpServerToolType]
 public class PlanTimeOffTool
@@ -30,13 +40,14 @@ public class PlanTimeOffTool
     [McpServerTool, Description("Help an employee plan when and whether they can take vacation, leave, or personal days based on their eligibility, benefit plan documentation, and the company calendar")]
     public async Task<IEnumerable<ContentBlock>> PlanTimeOff(
         string employeeId,
+        [Description("What type of time off are they planning? Unless it's obviously vacation planning, ask what type.")] TimeOffPlanKind specificTypeOfPlan,
         CancellationToken cancellationToken)
     {
-        var contentBlocks = await PlanTimeOffAsync(employeeId, cancellationToken).ToListAsync(cancellationToken);
+        var contentBlocks = await PlanTimeOffAsync(employeeId, specificTypeOfPlan, cancellationToken).ToListAsync(cancellationToken);
         return contentBlocks;
     }
 
-    private async IAsyncEnumerable<ContentBlock> PlanTimeOffAsync(string employeeId, [EnumeratorCancellation] CancellationToken cancellationToken)
+    private async IAsyncEnumerable<ContentBlock> PlanTimeOffAsync(string employeeId, TimeOffPlanKind planType, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var employeeDetails = await hrmAbsenceApi.GetWorkerByIdAsync(employeeId, cancellationToken);
 
@@ -46,10 +57,11 @@ public class PlanTimeOffTool
         };
 
         var eligibleAbsenceTypes = await hrmAbsenceApi.GetEligibleAbsenceTypesAsync(employeeId, "not_used", cancellationToken);
+        var eligibleAbsenceTypeNames = eligibleAbsenceTypes.AbsenceTypes.Select(at => at.Name).ToList();
 
         yield return new TextContentBlock
         {
-            Text = $"Eligible absence types: {JsonSerializer.Serialize(eligibleAbsenceTypes, McpJsonUtilities.DefaultOptions)}"
+            Text = $"Eligible absence types: {string.Join(", ", eligibleAbsenceTypeNames)}"
         };
 
         yield return new TextContentBlock
@@ -66,7 +78,7 @@ public class PlanTimeOffTool
             }
         };
 
-        await foreach (var block in ProvideRelevantPlanDocumentLinks(employeeId, cancellationToken))
+        await foreach (var block in ProvideRelevantPlanDocumentLinks(employeeId, planType, cancellationToken))
         {
             yield return block;
         }
@@ -80,7 +92,7 @@ public class PlanTimeOffTool
         }
     }
 
-    private async IAsyncEnumerable<ContentBlock> ProvideRelevantPlanDocumentLinks(string employeeId, [EnumeratorCancellation] CancellationToken cancellationToken)
+    private async IAsyncEnumerable<ContentBlock> ProvideRelevantPlanDocumentLinks(string employeeId, TimeOffPlanKind planKind, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var employeeBenefitPlans = await hrmAbsenceApi.GetWorkerBenefitPlansAsync(employeeId, "json", cancellationToken);
         var currentlyEffectivePlans = employeeBenefitPlans.BenefitPlans.Where(p => DateTime.UtcNow >= p.StartDate && p.EndDate >= DateTime.UtcNow).ToList();
@@ -102,9 +114,15 @@ public class PlanTimeOffTool
         var benefitPlanDocuments = await hrmDocumentService.GetBenefitPlanDocumentsAsync(cancellationToken);
         foreach (var plan in currentlyEffectivePlans)
         {
-            var matchingDocument = benefitPlanDocuments.Find(doc => doc.Category?.ToString() == plan.PlanType.Id);
+            var matchingDocument = benefitPlanDocuments.Where(doc => doc.Category != null).FirstOrDefault(doc => doc.Category.ToString() == plan.PlanType.Id);
+
             if (matchingDocument != null)
             {
+                if (!IsBenefitPlanDocumentIsRelevantToTimeOffPlanning(matchingDocument.Category!.Value, planKind))
+                {
+                    continue;
+                }
+
                 yield return new ResourceLinkBlock
                 {
                     Uri = DocumentResources.ResourceBenefitPlanDocumentUri.Replace("{documentId}", matchingDocument.DocumentId),
@@ -113,6 +131,20 @@ public class PlanTimeOffTool
                 };
             }
         }
+    }
+    
+    private bool IsBenefitPlanDocumentIsRelevantToTimeOffPlanning(PlanDocumentCategory category, TimeOffPlanKind planKind)
+    {
+        return (category, planKind) switch
+        {
+            (PlanDocumentCategory.Absence, TimeOffPlanKind.Vacation) => true,
+            (PlanDocumentCategory.Absence, TimeOffPlanKind.Sabbatical) => true,
+            (PlanDocumentCategory.Absence, TimeOffPlanKind.PersonalLeaveOfAbsence) => true,
+            (PlanDocumentCategory.Absence, TimeOffPlanKind.ParentalLeaveOrFMLA) => true,
+            (PlanDocumentCategory.Medical, TimeOffPlanKind.MedicalLeave) => true,
+            (PlanDocumentCategory.Medical, TimeOffPlanKind.ParentalLeaveOrFMLA) => true,
+            _ => false,
+        };
     }
     
     private async IAsyncEnumerable<ContentBlock> ProvideRelevantPlanExcerptsAsync(string queryText, int k, [EnumeratorCancellation] CancellationToken cancellationToken)
