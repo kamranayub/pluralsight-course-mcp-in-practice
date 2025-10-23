@@ -43,8 +43,12 @@ public class PlanTimeOffTool
         [Description("What type of time off are they planning? Unless it's obviously vacation planning, ask what type.")] TimeOffPlanKind specificTypeOfPlan,
         CancellationToken cancellationToken)
     {
-        var contentBlocks = await PlanTimeOffAsync(employeeId, specificTypeOfPlan, cancellationToken).ToListAsync(cancellationToken);
-        return contentBlocks;
+        var contentBlocksList = new List<ContentBlock>();
+        await foreach (var block in PlanTimeOffAsync(employeeId, specificTypeOfPlan, cancellationToken))
+        {
+            contentBlocksList.Add(block);
+        }
+        return contentBlocksList;
     }
 
     private async IAsyncEnumerable<ContentBlock> PlanTimeOffAsync(string employeeId, TimeOffPlanKind planType, [EnumeratorCancellation] CancellationToken cancellationToken)

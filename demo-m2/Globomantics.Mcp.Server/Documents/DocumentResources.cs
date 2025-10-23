@@ -37,7 +37,7 @@ public static class DocumentResources
 
         if (string.IsNullOrEmpty(downloadResult))
         {
-            throw new McpException("Benefit plan document content is empty", McpErrorCode.InternalError);
+            throw new McpProtocolException("Benefit plan document content is empty", McpErrorCode.InternalError);
         }
 
         return new BlobResourceContents
@@ -62,11 +62,14 @@ public static class DocumentResources
             var blobServiceClient = requestContext.Services?.GetService<BlobServiceClient>() ?? throw new InvalidOperationException("No Azure Blob Service Client was found");
             var containerClient = blobServiceClient.GetBlobContainerClient("globomanticshrm");
 
-            var blobListRequest = containerClient.GetBlobsAsync(cancellationToken: cancellationToken);
-            var blobList = await blobListRequest
-                .Where(blobItem => blobItem.Name.Contains(documentSearchValue, StringComparison.OrdinalIgnoreCase))
-                .Select(blobItem => blobItem.Name)
-                .ToListAsync(cancellationToken);
+            var blobList = new List<string>();
+            await foreach (var blobItem in containerClient.GetBlobsAsync(cancellationToken: cancellationToken))
+            {
+                if (blobItem.Name.Contains(documentSearchValue, StringComparison.OrdinalIgnoreCase))
+                {
+                    blobList.Add(blobItem.Name);
+                }
+            }
 
             result.Completion.Values = blobList;
         }
