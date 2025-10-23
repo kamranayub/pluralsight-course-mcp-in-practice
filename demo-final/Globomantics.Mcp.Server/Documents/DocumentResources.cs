@@ -37,7 +37,7 @@ public static class DocumentResources
 
         if (string.IsNullOrEmpty(downloadResult))
         {
-            throw new McpException("Benefit plan document content is empty", McpErrorCode.InternalError);
+            throw new McpProtocolException("Benefit plan document content is empty", McpErrorCode.InternalError);
         }
 
         return new BlobResourceContents
