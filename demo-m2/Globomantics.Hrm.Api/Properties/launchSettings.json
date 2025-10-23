@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "Globomantics.Hrm.Api": {
+      "commandName": "Project",
+      "commandLineArgs": "--port 7040",
+      "launchBrowser": false
+    }
+  }
+}

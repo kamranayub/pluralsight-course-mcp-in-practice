@@ -1,0 +1,16 @@
+{
+  "name": "@globomantics/mcp-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP server for Globomantics",
+  "scripts": {
+    "start": "dotnet run",
+    "dev": "npx @modelcontextprotocol/inspector --config mcp.json"
+  },
+  "keywords": [],
+  "author": "Kamran Ayub",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@modelcontextprotocol/inspector": "0.17.2"
+  }
+}
