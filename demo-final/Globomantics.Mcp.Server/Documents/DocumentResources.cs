@@ -29,9 +29,9 @@ public static class DocumentResources
         });
     }
 
-    [McpServerResource(UriTemplate = ResourceBenefitPlanDocumentUri, Name = "Benefit Plan Document", MimeType = "text/plain")]
+    [McpServerResource(UriTemplate = ResourceBenefitPlanDocumentUri, Name = "Benefit Plan Document")]
     [Description("Retrieves a specific HRM benefit plan document by its resource ID")]
-    public static async Task<ResourceContents> DocumentResourceById(IHrmDocumentService documentService, string documentId, CancellationToken cancellationToken)
+    public static async Task<ResourceContents> DocumentResourceById(string documentId, IHrmDocumentService documentService, CancellationToken cancellationToken)
     {
         var downloadResult = await documentService.GetBenefitPlanDocumentContentAsync(documentId, cancellationToken);
 
@@ -44,7 +44,7 @@ public static class DocumentResources
         {
             Blob = downloadResult,
             MimeType = "application/pdf",
-            Uri = $"globomantics://hrm/benefit-documents/{documentId}",
+            Uri = ResourceBenefitPlanDocumentUri.Replace("{documentId}", documentId),
         };
     }
 

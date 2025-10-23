@@ -25,7 +25,7 @@ public static class CalendarResources
     public const string ResourceEmployeeCalendarUri = "globomantics://hrm/calendars/employee/{employeeId}";
 
     [McpServerResource(UriTemplate = ResourceEmployeeCalendarUri, Name = "Employee Calendar", MimeType = "application/json")]
-    [Description("The current year employee time-off calendar")]
+    [Description("The current employee's planned time-off calendar")]
     public static async Task<string> EmployeeCalendarResource(string employeeId, IHrmAbsenceApi hrmAbsenceApi, CancellationToken cancellationToken)
     {
         var employeeTimeOff = await hrmAbsenceApi.GetWorkerPlannedTimeOffAsync(employeeId, "json", cancellationToken);

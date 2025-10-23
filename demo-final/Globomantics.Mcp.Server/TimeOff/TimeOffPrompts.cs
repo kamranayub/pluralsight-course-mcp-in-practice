@@ -1,3 +1,5 @@
+using System.Threading.Tasks;
+using Globomantics.Mcp.Server.TimeOff;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
@@ -9,39 +11,6 @@ public static class TimeOffPrompts
     [McpServerPrompt(Title = "Suggest Time Off Work (Basic)")]
     public static string SuggestTimeOffPrompt()
     {
-        return "When is the next scheduled Globomantics work holiday? Please suggest some good dates for planning time off, such as 3- or 4-day weekends.";
-    }
-
-    [McpServerPrompt(Title = "Suggest Time Off Work (Smart)")]
-    public static IEnumerable<PromptMessage> SuggestTimeOffPromptSmart(int year, WorkLocation location)
-    {
-        yield return new PromptMessage()
-        {
-            Role = Role.Assistant,
-            Content = new TextContentBlock() {
-                Text = "You are an expert HR assistant helping employees plan their time off work based on the provided company's holiday calendar. Do not call a tool, just use the embedded calendar below."
-            }
-        };
-
-        yield return new PromptMessage()
-        {
-            Role = Role.Assistant,
-            Content = new EmbeddedResourceBlock() {
-                Resource = new TextResourceContents() {
-                    MimeType = "application/json",
-                    Uri = CalendarResources.ResourceWorkByLocationCalendarUri.Replace("{year}", year.ToString()).Replace("{location}", location.ToString()),
-                    Text = CalendarResources.WorkCalendarByLocationResource(year, location)
-                },
-            }
-        };
-
-        yield return new PromptMessage()
-        {
-            Role = Role.User,
-            Content = new TextContentBlock()
-            {
-                Text = "When is the next scheduled Globomantics work holiday? Please suggest some good dates for planning time off, such as 3- or 4-day weekends."
-            }
-        };            
+        return "Using the Globomantics time off planning tool, please suggest some good dates for my next vacation, such as 3- or 4-day weekends.";
     }
 }
