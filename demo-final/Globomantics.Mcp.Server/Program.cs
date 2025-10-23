@@ -9,8 +9,13 @@ using Microsoft.Extensions.Logging;
 using Azure.Search.Documents;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure port for Azure Functions custom handler
+var port = Environment.GetEnvironmentVariable("FUNCTIONS_CUSTOMHANDLER_PORT") ?? "5000";
+builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
 // Configure user secrets and env vars for local development
 builder.Configuration

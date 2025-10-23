@@ -8,14 +8,6 @@
                 "server",
                 "start"
             ]
-        },
-        "globomantics-mcp-server": {
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project",
-                "E:\\Development\\Contrib\\pluralsight-mcp-in-practice\\demo-final\\Globomantics.Mcp.Server\\Globomantics.Mcp.Server.csproj"
-            ]
         }
     }
 }

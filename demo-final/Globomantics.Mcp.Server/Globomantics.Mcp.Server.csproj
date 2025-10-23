@@ -25,4 +25,10 @@
     <ProjectReference Include="..\Globomantics.Hrm.Api\Globomantics.Hrm.Api.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include=".azurefunctions\**">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>
