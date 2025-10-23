@@ -22,12 +22,25 @@ public class HrmDocumentService : IHrmDocumentService
     public async Task<List<DocumentInfo>> GetBenefitPlanDocumentsAsync(CancellationToken cancellationToken)
     {
         var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
-        var documentBlobs = await containerClient.GetBlobsAsync(traits: Azure.Storage.Blobs.Models.BlobTraits.Metadata).ToListAsync();
-        var documentInfos = documentBlobs.Select(b => new DocumentInfo(b.Name,
-            Path.GetFileNameWithoutExtension(b.Name),
-            b.Metadata.TryGetValue("Description", out string? value) ? value : null,
-            b.Metadata.TryGetValue("Category", out string? category) && Enum.TryParse(category, out PlanDocumentCategory parsedCategory) ? parsedCategory : null
-        )).ToList();
+        var documentBlobs = new List<Azure.Storage.Blobs.Models.BlobItem>();
+        await foreach (var blob in containerClient.GetBlobsAsync(traits: Azure.Storage.Blobs.Models.BlobTraits.Metadata, cancellationToken: cancellationToken))
+        {
+            documentBlobs.Add(blob);
+        }
+        
+        var documentInfos = documentBlobs.Select(b => {
+            PlanDocumentCategory? parsedCategory = null;
+            if (b.Metadata.TryGetValue("Category", out string? category) && Enum.TryParse(category, out PlanDocumentCategory tempCategory))
+            {
+                parsedCategory = tempCategory;
+            }
+            
+            return new DocumentInfo(b.Name,
+                Path.GetFileNameWithoutExtension(b.Name),
+                b.Metadata.TryGetValue("Description", out string? value) ? value : null,
+                parsedCategory
+            );
+        }).ToList();
 
         return documentInfos;
     }
