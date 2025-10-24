@@ -8,6 +8,10 @@
                 "server",
                 "start"
             ]
+        },
+        "globomantics-mcp-server-local": {
+            "type": "http",
+            "url": "http://localhost:5000/"
         }
     }
 }

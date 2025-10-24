@@ -43,19 +43,19 @@ builder.Services.AddCors(options =>
 .AddJwtBearer(options =>
 {
     var tenantId = builder.Configuration["AZURE_TENANT_ID"];
-    var aadOAuthServerUrl = $"https://login.microsoftonline.com/{tenantId}/v2.0";
+    var azureIssuerUrl = $"https://sts.windows.net/{tenantId}/";
     var mcpClientId = builder.Configuration["MCP_SERVER_AAD_CLIENT_ID"];
 
-    options.Authority = aadOAuthServerUrl;
+    options.Authority = azureIssuerUrl;
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true,
-        ValidIssuer = aadOAuthServerUrl,
+        ValidIssuer = azureIssuerUrl,
         ValidateAudience = true,
         ValidAudiences = [mcpClientId, $"api://{mcpClientId}"],
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-        NameClaimType = "preferred_username",
+        NameClaimType = "name",
         RoleClaimType = "roles"
     };
 
@@ -63,8 +63,9 @@ builder.Services.AddCors(options =>
     {
         OnTokenValidated = context =>
         {
+            var authToken = context.HttpContext.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
             var name = context.Principal?.Identity?.Name ?? "unknown";
-            var email = context.Principal?.FindFirstValue("preferred_username") ?? "unknown";
+            var email = context.Principal?.FindFirstValue(ClaimTypes.Email) ?? "unknown";
             Console.WriteLine($"Token validated for: {name} ({email})");
             return Task.CompletedTask;
         },
