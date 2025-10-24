@@ -71,6 +71,14 @@ To configure this, create an **App Registration** for the MCP server and grant i
 > Make sure you own both the MCP server and HRM API app registrations.
 > Otherwise, the HRM API’s `user_impersonation` delegated permission won’t appear when you edit the MCP app registration.
 
+- Ensure `http://localhost:6274/oauth/callback/debug` and `http://localhost:6274/oauth/callback` are added as Redirect URIs
+- Ensure an API Permission scope is created for `api://{client_id}/user_impersonation` (which will allow delegated access)
+
+> [!IMPORTANT]
+> The demo uses a simplified (and less secure) OAuth flow that is compatible with Azure Entra ID and does not use Azure API Management. However, the best practice would be to ensure **no Entra ID tokens** are sent back to the MCP client. For an advanced flow that demonstrates this, see [Den Delimarsky's sample and write-up](https://github.com/localden/remote-auth-mcp-apim-py) using APIM.
+>
+> In order to support the simpler flow, I had to [patch](patches/) the `@modelcontextprotocol/inspector` and `@modelcontextprotocol/inspector-client` packages, based on some work by Jeremy Smith (see [commits](https://github.com/modelcontextprotocol/inspector/compare/main...2underscores:inspector:azure-no-code-challenge-in-metadata) and [discussion](https://github.com/modelcontextprotocol/inspector/issues/685)). 
+
 ## Examples
 
 ### Ping Server
