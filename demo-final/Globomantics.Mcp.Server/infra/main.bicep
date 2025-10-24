@@ -119,6 +119,11 @@ module api './app/api.bicep' = {
     identityId: apiUserAssignedIdentity.outputs.resourceId
     identityClientId: apiUserAssignedIdentity.outputs.clientId
     appSettings: {
+      AZURE_TENANT_ID: tenant().tenantId
+      MCP_SERVER_AAD_CLIENT_ID: ''
+      MCP_SERVER_AAD_CLIENT_SECRET: ''
+      HRM_API_AAD_CLIENT_ID: ''
+      HRM_API_ENDPOINT: 'https://globomanticshrmapi-bqhjgyb4e8fxc0gv.eastus-01.azurewebsites.net'
     }
     virtualNetworkSubnetId: vnetEnabled ? serviceVirtualNetwork.outputs.appSubnetID : ''
   }
