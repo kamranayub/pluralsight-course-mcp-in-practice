@@ -1,0 +1,4 @@
+{
+    "debug.internalConsoleOptions": "neverOpen",
+    "azurite.location": ".azurite"
+}
