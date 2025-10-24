@@ -63,7 +63,7 @@ builder.Services.AddCors(options =>
     {
         OnTokenValidated = context =>
         {
-            var authToken = context.HttpContext.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+            var authToken = context.HttpContext.Request.Headers.Authorization.ToString().Replace("Bearer ", "");
             var name = context.Principal?.Identity?.Name ?? "unknown";
             var email = context.Principal?.FindFirstValue(ClaimTypes.Email) ?? "unknown";
             Console.WriteLine($"Token validated for: {name} ({email})");
@@ -99,6 +99,9 @@ builder.Services.AddCors(options =>
 // Add authorization support
 builder.Services.AddAuthorization();
 
+// Allow accessing HttpContext in services
+builder.Services.AddHttpContextAccessor();
+
 // Configure MCP server
 builder.Services.AddMcpServer()
     .WithHttpTransport(options =>
@@ -111,6 +114,9 @@ builder.Services.AddMcpServer()
     .WithPromptsFromAssembly();
 
 // Configure Azure clients and services
+// This is using DefaultAzureCredential which uses the local developer identity
+// and in production uses the managed identity assigned to the Azure Functions app
+// (i.e. it does not perform actions or authenticate on behalf of the user)
 var azureCredential = new DefaultAzureCredential();
 builder.Services.AddSingleton(_ => new BlobServiceClient(
         new Uri("https://psmcpdemo.blob.core.windows.net/"),
@@ -121,19 +127,24 @@ builder.Services.AddSingleton(_ => new SearchClient(
         "rag-globomantics-hrm",
         azureCredential));
 
-builder.Services.AddSingleton(_ =>
+builder.Services.AddSingleton(services =>
 {
-    // TODO: OBO flow
+    // This is using an OBO (On-Behalf-Of) flow to call the HRM API on behalf of the signed-in user
+    // It does not use passwordless authentication or managed identity, but instead exchanges
+    // the user's access token for a new access token to call the HRM API using the MCP client secret credential
     var tenantId = builder.Configuration["AZURE_TENANT_ID"];
     var mcpClientId = builder.Configuration["MCP_SERVER_AAD_CLIENT_ID"];
     var mcpClientSecret = builder.Configuration["MCP_SERVER_AAD_CLIENT_SECRET"];
     var hrmAppId = builder.Configuration["HRM_API_AAD_CLIENT_ID"];
-    var hrmClientSecretCredential = new ClientSecretCredential(tenantId, mcpClientId, mcpClientSecret);
 
     return RestClient.For<IHrmAbsenceApi>("https://globomanticshrmapi-bqhjgyb4e8fxc0gv.eastus-01.azurewebsites.net", async (request, cancellationToken) =>
             {
-                var token = await hrmClientSecretCredential.GetTokenAsync(
-                    new TokenRequestContext([$"api://{hrmAppId}/.default"]), cancellationToken);
+                var httpContext = services.GetRequiredService<IHttpContextAccessor>().HttpContext ?? throw new InvalidOperationException("No HttpContext available to acquire user token.");
+                var userAccessToken = httpContext.Request.Headers.Authorization.ToString().Replace("Bearer ", "");
+                var hrmOboCredential = new OnBehalfOfCredential(tenantId, mcpClientId, mcpClientSecret, userAccessToken);
+
+                var token = await hrmOboCredential.GetTokenAsync(
+                    new TokenRequestContext([$"api://{hrmAppId}/user_impersonation"]), cancellationToken);
                 request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Token);
             });
 });

@@ -8,17 +8,17 @@
       "projectPath": "${workspaceFolder}/Globomantics.Mcp.Server/Globomantics.Mcp.Server.csproj"
     },
     {
-      "name": "Attach to .NET Functions",
-      "type": "coreclr",
-      "request": "attach",
-      "processId": "${command:azureFunctions.pickProcess}"
-    },
-    {
       "name": "Debug MCP Server (stdio)",
       "type": "dotnetwatchattach",
       "request": "attach",
       "program": "Globomantics.Mcp.Server.exe",
-      "task": "Run MCP Inspector (stdio -> dotnet run)",
+      "task": "Run MCP Inspector (stdio -> dotnet run)"
+    },
+    {
+      "name": "Attach to .NET Functions",
+      "type": "coreclr",
+      "request": "attach",
+      "processId": "${command:azureFunctions.pickProcess}"
     }
   ]
 }

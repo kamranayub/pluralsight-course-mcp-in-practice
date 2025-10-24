@@ -39,12 +39,12 @@ public class PlanTimeOffTool
     
     [McpServerTool, Description("Help an employee plan when and whether they can take vacation, leave, or personal days based on their eligibility, benefit plan documentation, and the company calendar")]
     public async Task<IEnumerable<ContentBlock>> PlanTimeOff(
-        string employeeId,
         [Description("What type of time off are they planning? Unless it's obviously vacation planning, ask what type.")] TimeOffPlanKind specificTypeOfPlan,
         CancellationToken cancellationToken)
     {
+        var employeeIdResponse = await hrmAbsenceApi.GetAuthenticatedUserIdAsync(cancellationToken);
         var contentBlocksList = new List<ContentBlock>();
-        await foreach (var block in PlanTimeOffAsync(employeeId, specificTypeOfPlan, cancellationToken))
+        await foreach (var block in PlanTimeOffAsync(employeeIdResponse.EmployeeId, specificTypeOfPlan, cancellationToken))
         {
             contentBlocksList.Add(block);
         }
@@ -76,9 +76,9 @@ public class PlanTimeOffTool
         {
             Resource = new TextResourceContents()
             {
-                Uri = CalendarResources.ResourceEmployeeCalendarUri.Replace("{employeeId}", employeeId),
+                Uri = CalendarResources.ResourceEmployeeCalendarUri,
                 MimeType = "application/json",
-                Text = await CalendarResources.EmployeeCalendarResource(employeeId, hrmAbsenceApi, cancellationToken),
+                Text = await CalendarResources.EmployeeCalendarResource(hrmAbsenceApi, cancellationToken),
             }
         };
 

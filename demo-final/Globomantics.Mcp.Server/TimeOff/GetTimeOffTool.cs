@@ -16,9 +16,9 @@ public class GetTimeOffTool
     }
 
     [McpServerTool, Description("Get the employee's combined work and personal absence calendars for planning time off work")]
-    public async Task<IEnumerable<ContentBlock>> GetTimeOff(string employeeId, CancellationToken cancellationToken)
+    public async Task<IEnumerable<ContentBlock>> GetTimeOff(CancellationToken cancellationToken)
     {
-        var employeeCalendarResource = await CalendarResources.EmployeeCalendarResource(employeeId, hrmAbsenceApi, cancellationToken);
+        var employeeCalendarResource = await CalendarResources.EmployeeCalendarResource(hrmAbsenceApi, cancellationToken);
 
         return [
             new TextContentBlock
@@ -38,7 +38,7 @@ public class GetTimeOffTool
             {
                 Resource = new TextResourceContents()
                 {
-                    Uri = CalendarResources.ResourceEmployeeCalendarUri.Replace("{employeeId}", employeeId),
+                    Uri = CalendarResources.ResourceEmployeeCalendarUri,
                     MimeType = "application/json",
                     Text = employeeCalendarResource,
                 }
