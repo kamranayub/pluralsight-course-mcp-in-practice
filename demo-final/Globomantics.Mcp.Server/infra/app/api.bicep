@@ -102,9 +102,8 @@ module mcp 'br/public:avm/res/web/site:0.15.1' = {
     webConfiguration: {
       cors: {
         allowedOrigins: [
-          'http://localhost:6274' // MCP inspector local dev URL
+          '*' // To support AI tool clients
         ]
-        supportCredentials: true
       }
     }
     virtualNetworkSubnetId: !empty(virtualNetworkSubnetId) ? virtualNetworkSubnetId : null

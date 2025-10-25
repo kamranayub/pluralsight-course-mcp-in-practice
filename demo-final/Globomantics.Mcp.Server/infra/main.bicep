@@ -119,11 +119,9 @@ module api './app/api.bicep' = {
     identityId: apiUserAssignedIdentity.outputs.resourceId
     identityClientId: apiUserAssignedIdentity.outputs.clientId
     appSettings: {
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: 'true'
       AZURE_TENANT_ID: tenant().tenantId
-      AZURE_CLIENT_ID: apiUserAssignedIdentity.outputs.clientId      
-      MCP_SERVER_AAD_CLIENT_ID: ''
-      MCP_SERVER_AAD_CLIENT_SECRET: ''
-      HRM_API_AAD_CLIENT_ID: ''
+      AZURE_CLIENT_ID: apiUserAssignedIdentity.outputs.clientId
       HRM_API_ENDPOINT: 'https://globomanticshrmapi-bqhjgyb4e8fxc0gv.eastus-01.azurewebsites.net'
     }
     virtualNetworkSubnetId: vnetEnabled ? serviceVirtualNetwork.outputs.appSubnetID : ''

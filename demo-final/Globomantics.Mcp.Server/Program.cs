@@ -9,6 +9,7 @@ using ModelContextProtocol.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -77,6 +78,13 @@ builder.Services.AddCors(options =>
         OnChallenge = context =>
         {
             Console.WriteLine($"Challenging client to authenticate with Entra ID");
+
+            // In production, the app runs behind Functions proxy that may return https://127.0.0.1:{port}
+            context.HandleResponse();
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            context.Response.Headers.WWWAuthenticate =
+                $"Bearer realm=\"mcp\", resource_metadata=\"{serverUrl}/.well-known/oauth-protected-resource\"";
+
             return Task.CompletedTask;
         }
     };
@@ -94,7 +102,15 @@ builder.Services.AddCors(options =>
         AuthorizationServers = { new Uri(aadOAuthServerUrl) },
         ScopesSupported = [$"api://{mcpClientId}/user_impersonation"],
     };
-});;
+});
+
+// Configure Forwarded Headers Middleware to handle proxy headers correctly
+// See: https://docs.duendesoftware.com/identityserver/deployment/#proxy-servers-and-load-balancers
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedHost 
+        | ForwardedHeaders.XForwardedProto;
+});
 
 // Add authorization support
 builder.Services.AddAuthorization();
