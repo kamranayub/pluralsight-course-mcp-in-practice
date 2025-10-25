@@ -44,7 +44,7 @@ For accessing Azure, the demo uses `Azure.Identity` which supports multiple cred
 
 For accessing Blob Containers, the demo uses Microsoft Entra ID authentication, [which requires the Blob Storage Reader role to be assigned](https://learn.microsoft.com/en-us/azure/storage/blobs/assign-azure-role-data-access?tabs=portal).
 
-For the demo user to access Azure AI Search, the roles **Azure Search Service Reader** is required and the AI Search service needs RBAC-based authentication enabled.
+For the demo user to access Azure AI Search, the roles **Search Index Data Reader** is required and the AI Search service needs RBAC-based authentication enabled.
 
 ### Auth
 

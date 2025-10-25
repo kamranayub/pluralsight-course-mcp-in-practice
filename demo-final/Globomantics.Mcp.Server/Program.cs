@@ -114,10 +114,19 @@ builder.Services.AddMcpServer()
     .WithPromptsFromAssembly();
 
 // Configure Azure clients and services
-// This is using DefaultAzureCredential which uses the local developer identity
-// and in production uses the managed identity assigned to the Azure Functions app
-// (i.e. it does not perform actions or authenticate on behalf of the user)
-var azureCredential = new DefaultAzureCredential();
+TokenCredential azureCredential;
+
+if (builder.Environment.IsProduction() || builder.Environment.IsStaging())
+{
+    azureCredential = new ManagedIdentityCredential(
+        ManagedIdentityId.FromUserAssignedClientId(builder.Configuration["AZURE_CLIENT_ID"]));
+}
+else
+{
+    // local development environment
+    azureCredential = new DefaultAzureCredential();
+}
+
 builder.Services.AddSingleton(_ => new BlobServiceClient(
         new Uri("https://psmcpdemo.blob.core.windows.net/"),
         azureCredential));

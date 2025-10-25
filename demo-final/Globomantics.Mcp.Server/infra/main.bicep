@@ -120,6 +120,7 @@ module api './app/api.bicep' = {
     identityClientId: apiUserAssignedIdentity.outputs.clientId
     appSettings: {
       AZURE_TENANT_ID: tenant().tenantId
+      AZURE_CLIENT_ID: apiUserAssignedIdentity.outputs.clientId      
       MCP_SERVER_AAD_CLIENT_ID: ''
       MCP_SERVER_AAD_CLIENT_SECRET: ''
       HRM_API_AAD_CLIENT_ID: ''
@@ -177,6 +178,16 @@ module rbac 'app/rbac.bicep' = {
     enableQueue: storageEndpointConfig.enableQueue
     enableTable: storageEndpointConfig.enableTable
     allowUserIdentityPrincipal: storageEndpointConfig.allowUserIdentityPrincipal
+  }
+}
+
+// TODO: Not defined in MCP bicep, grant access to existing resources for PS demo
+module psdemo 'app/psdemo.bicep' = {
+  scope: resourceGroup('pluralsight-mcp')
+  params: {
+    hrmDocumentStorageAccountName: 'psmcpdemo'
+    searchServiceName: 'psdemo'
+    managedIdentityPrincipalId: apiUserAssignedIdentity.outputs.principalId
   }
 }
 
