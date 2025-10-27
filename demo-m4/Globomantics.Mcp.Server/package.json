@@ -1,0 +1,20 @@
+{
+  "name": "@globomantics/mcp-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP server for Globomantics",
+  "scripts": {
+    "start": "dotnet run",
+    "dev": "npx @modelcontextprotocol/inspector --config mcp.json --server globomantics-hrm",
+    "prod": "npx @modelcontextprotocol/inspector --config mcp.json --server globomantics-hrm-prod",
+    "func": "npx @modelcontextprotocol/inspector --config mcp.json --server globomantics-hrm-func",
+    "postinstall": "patch-package"
+  },
+  "keywords": [],
+  "author": "Kamran Ayub",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@modelcontextprotocol/inspector": "0.17.2",
+    "patch-package": "^8.0.1"
+  }
+}

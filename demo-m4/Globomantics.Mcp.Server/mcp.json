@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "globomantics-hrm": {
+      "type": "streamable-http",
+      "url": "http://localhost:5000/"
+    },
+    "globomantics-hrm-prod": {
+      "type": "streamable-http",
+      "url": "https://func-globomantics-mcp-7emfn6vonnqs4.azurewebsites.net/"
+    },
+    "globomantics-hrm-func": {
+      "type": "streamable-http",
+      "url": "http://localhost:7071/"
+    }
+  }
+}
