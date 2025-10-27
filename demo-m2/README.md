@@ -1,2 +1,0 @@
-# Pluralsight MCP Demo
-
