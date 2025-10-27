@@ -9,6 +9,8 @@ dotnet user-secrets init
 
 # Azure Tenant ID (optional -- for Visual Studio credential auth)
 dotnet user-secrets set "AZURE_TENANT_ID" "<tenant_id>"
+# Azure Functions App Endpoint for HRM API
+dotnet user-secrets set "HRM_API_ENDPOINT" "<endpoint>"
 # Azure Entra application ID for the HRM API (EasyAuth)
 dotnet user-secrets set "HRM_API_AAD_CLIENT_ID" "<client_id>"
 # Azure Entra application ID for the MCP Server (S2S auth)
@@ -30,10 +32,6 @@ Starts the .NET MCP server using `dotnet run` command.
 ### `npm run dev`
 
 Starts the MCP inspector using the default `mcp.json` config file.
-
-### `npm run dev:az`
-
-Starts the MCP inspector using a `mcp.azure.json` config file. Only use this if you want to fully replicate the demo environment shown in the course.
 
 ## Azure Configuration
 

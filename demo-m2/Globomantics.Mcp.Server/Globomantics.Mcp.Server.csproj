@@ -21,7 +21,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Globomantics.Hrm.Api\Globomantics.Hrm.Api.csproj" />
+  <Compile Include="..\Globomantics.Hrm.Api\Models.cs">
+    <Link>Models.cs</Link>
+  </Compile>
   </ItemGroup>
 
 </Project>

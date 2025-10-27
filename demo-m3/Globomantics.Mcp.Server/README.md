@@ -9,6 +9,8 @@ dotnet user-secrets init
 
 # Azure Tenant ID (optional -- for Visual Studio credential auth)
 dotnet user-secrets set "AZURE_TENANT_ID" "<tenant_id>"
+# Azure Functions App Endpoint for HRM API
+dotnet user-secrets set "HRM_API_ENDPOINT" "<endpoint>"
 # Azure Entra application ID for the HRM API (EasyAuth)
 dotnet user-secrets set "HRM_API_AAD_CLIENT_ID" "<client_id>"
 # Azure Entra application ID for the MCP Server (S2S auth)
@@ -31,10 +33,6 @@ Starts the .NET MCP server using `dotnet run` command.
 
 Starts the MCP inspector using the default `mcp.json` config file.
 
-### `npm run dev:az`
-
-Starts the MCP inspector using a `mcp.azure.json` config file. Only use this if you want to fully replicate the demo environment shown in the course.
-
 ## Azure Configuration
 
 For Microsoft Azure resources, you'll need to deploy the demo resources and have appropriate authentication.
@@ -44,7 +42,7 @@ For accessing Azure, the demo uses `Azure.Identity` which supports multiple cred
 
 For accessing Blob Containers, the demo uses Microsoft Entra ID authentication, [which requires the Blob Storage Reader role to be assigned](https://learn.microsoft.com/en-us/azure/storage/blobs/assign-azure-role-data-access?tabs=portal).
 
-For the demo user to access Azure AI Search, the roles **Azure Search Service Reader** is required and the AI Search service needs RBAC-based authentication enabled.
+For the demo user to access Azure AI Search, the roles **Search Index Data Reader** is required and the AI Search service needs RBAC-based authentication enabled.
 
 ### Auth
 

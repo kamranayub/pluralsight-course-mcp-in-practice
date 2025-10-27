@@ -229,7 +229,9 @@ public class HrmFunctions
             _logger.LogInformation($"Parsed Claim Type: {claim.Type}, Value: {claim.Value}");
         }
 
-        return claimsPrincipal.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value ?? "user@globomantics.com"; // Default for no authentication
+        return claimsPrincipal.FindFirstValue(ClaimTypes.Email) 
+            ?? claimsPrincipal.FindFirstValue("preferred_username") 
+            ?? "user@globomantics.com"; // Default for no authentication
     }
 
     private async Task<HttpResponseData> CreateErrorResponse(HttpRequestData req, HttpStatusCode statusCode, string message)
