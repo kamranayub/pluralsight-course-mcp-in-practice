@@ -76,3 +76,7 @@ TestResults/
 *.tmp
 *.swp
 *.scc
+
+# Azurite
+.azurite/
+__azurite*
