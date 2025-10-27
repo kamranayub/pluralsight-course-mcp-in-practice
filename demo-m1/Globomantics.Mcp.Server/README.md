@@ -1,3 +1,15 @@
+# Globomantics MCP Server
+
+## Commands
+
+### `npm start`
+
+Starts the .NET MCP server using `dotnet run` command.
+
+### `npm run dev`
+
+Starts the MCP inspector using the default `mcp.json` config file.
+
 ## Examples
 
 ### Ping Server
