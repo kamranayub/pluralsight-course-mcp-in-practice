@@ -11,6 +11,6 @@
   "author": "Kamran Ayub",
   "license": "Apache-2.0",
   "devDependencies": {
-    "@modelcontextprotocol/inspector": "0.17.0"
+    "@modelcontextprotocol/inspector": "0.17.2"
   }
 }
