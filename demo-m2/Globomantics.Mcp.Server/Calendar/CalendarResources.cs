@@ -10,10 +10,11 @@ public class CalendarResources
 {
     [McpServerResource(
         UriTemplate = "globomantics://hrm/calendars/work",
-        Name = "Work Calendar",
+        Name = "work-calendars.json",
+        Title = "Work Holiday Calendars",
         MimeType = "application/json")]
     [Description("Returns the holiday calendars for different work locations (United States and India).")]
-    public static string WorkCalendarResource()
+    public static string WorkCalendarsResource()
     {
         var usCalendar = AnnualHolidayCalendar.CreateForYear(DateTime.Now.Year, WorkLocation.UnitedStates);
         var inCalendar = AnnualHolidayCalendar.CreateForYear(DateTime.Now.Year, WorkLocation.India);

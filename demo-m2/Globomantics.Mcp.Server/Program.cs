@@ -1,4 +1,7 @@
-﻿using Globomantics.Mcp.Server.Calendar;
+﻿using Azure.Identity;
+using Azure.Storage.Blobs;
+using Globomantics.Mcp.Server.Calendar;
+using Globomantics.Mcp.Server.Documents;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -13,7 +16,15 @@ builder.Logging.AddConsole(consoleLogOptions =>
 
 builder.Services.AddMcpServer()
     .WithStdioServerTransport()
-    .WithResources<CalendarResources>();
+    .WithResources<CalendarResources>()
+    .WithResources<DocumentResources>();
+
+// Register HRM document service to connect to Azure Blob Storage
+builder.Services
+    .AddSingleton(_ => new BlobServiceClient(
+        new Uri("https://psmcpdemo.blob.core.windows.net/"),
+        new DefaultAzureCredential()))
+    .AddSingleton<IHrmDocumentService, HrmDocumentService>();
 
 var app = builder.Build();
 
