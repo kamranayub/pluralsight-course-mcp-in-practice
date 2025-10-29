@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Globomantics.Mcp.Server.Calendar;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -11,7 +12,8 @@ builder.Logging.AddConsole(consoleLogOptions =>
 });
 
 builder.Services.AddMcpServer()
-    .WithStdioServerTransport();
+    .WithStdioServerTransport()
+    .WithResources<CalendarResources>();
 
 var app = builder.Build();
 
