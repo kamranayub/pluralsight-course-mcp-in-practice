@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Globomantics.Mcp.Server.TimeOff;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
 
@@ -26,6 +27,27 @@ public class CalendarResources
         };
 
         return JsonSerializer.Serialize(workCalendarResource, McpJsonUtilities.DefaultOptions);
+    }
+
+    public const string ResourceEmployeeCalendarUri = "globomantics://hrm/calendars/employee/{employeeId}";
+
+    [McpServerResource(UriTemplate = ResourceEmployeeCalendarUri, Name = "Employee Calendar", MimeType = "application/json")]
+    [Description("The current employee's planned time-off calendar")]
+    public static async Task<string> EmployeeCalendarResource(string employeeId, IHrmAbsenceApi hrmAbsenceApi, CancellationToken cancellationToken)
+    {
+        var employeeTimeOff = await hrmAbsenceApi.GetWorkerPlannedTimeOffAsync(employeeId, "json", cancellationToken);
+
+        return JsonSerializer.Serialize(employeeTimeOff, McpJsonUtilities.DefaultOptions);
+    }
+
+    public const string ResourceWorkByLocationCalendarUri = "globomantics://hrm/calendars/work/{year}/{location}";
+
+    [McpServerResource(UriTemplate = ResourceWorkByLocationCalendarUri, Name = "Work Calendar by Location", MimeType = "application/json")]
+    [Description("The work calendar for a specific year and location")]
+    public static string WorkCalendarByLocationResource(int year, WorkLocation location)
+    {
+        var calendar = AnnualHolidayCalendar.CreateForYear(year, location);
+        return JsonSerializer.Serialize(calendar, McpJsonUtilities.DefaultOptions);
     }
 }
 

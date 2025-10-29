@@ -25,4 +25,26 @@ public class DocumentResources
             Uri = $"globomantics://hrm/documents/{info.DocumentId}",
         });
     }
+
+    [McpServerResource(
+        UriTemplate = "globomantics://hrm/documents/{documentId}",
+        Name = "HR Benefit Plan and Policy Document by ID",
+        MimeType = "application/pdf")]
+    [Description("Retrieves a specific HRM benefit plan document by its document ID (e.g. Globomantics-Plan.pdf)")]
+    public static async Task<ResourceContents> DocumentResourceById(string documentId, IHrmDocumentService documentService, CancellationToken cancellationToken)
+    {
+        var downloadResult = await documentService.GetBenefitPlanDocumentContentAsync(documentId, cancellationToken);
+
+        if (string.IsNullOrEmpty(downloadResult))
+        {
+            throw new McpProtocolException("Benefit plan document content is empty", McpErrorCode.InternalError);
+        }
+
+        return new BlobResourceContents
+        {
+            Blob = downloadResult,
+            MimeType = "application/pdf",
+            Uri = $"globomantics://hrm/documents/{documentId}",
+        };
+    }
 }
