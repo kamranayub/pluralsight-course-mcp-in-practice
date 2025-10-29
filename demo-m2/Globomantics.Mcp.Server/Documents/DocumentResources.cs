@@ -6,10 +6,14 @@ using ModelContextProtocol.Server;
 
 namespace Globomantics.Mcp.Server.Documents;
 
-public class DocumentResources
+[McpServerResourceType]
+public static class DocumentResources
 {
+    public const string ResourceBenefitPlanDocumentsUri = "globomantics://hrm/documents";
+    public const string ResourceBenefitPlanDocumentUri = "globomantics://hrm/documents/{documentId}";
+
     [McpServerResource(
-        UriTemplate = "globomantics://hrm/documents",
+        UriTemplate = ResourceBenefitPlanDocumentsUri,
         Name = "policy-documents.json",
         Title = "HR Benefit Plan and Policy Documents",
         MimeType = "application/json")]
@@ -22,12 +26,12 @@ public class DocumentResources
         {
             Text = JsonSerializer.Serialize(info, McpJsonUtilities.DefaultOptions),
             MimeType = "application/json",
-            Uri = $"globomantics://hrm/documents/{info.DocumentId}",
+            Uri = ResourceBenefitPlanDocumentUri.Replace("{documentId}", info.DocumentId),
         });
     }
 
     [McpServerResource(
-        UriTemplate = "globomantics://hrm/documents/{documentId}",
+        UriTemplate = ResourceBenefitPlanDocumentUri,
         Name = "HR Benefit Plan and Policy Document by ID",
         MimeType = "application/pdf")]
     [Description("Retrieves a specific HRM benefit plan document by its document ID (e.g. Globomantics-Plan.pdf)")]
@@ -44,7 +48,7 @@ public class DocumentResources
         {
             Blob = downloadResult,
             MimeType = "application/pdf",
-            Uri = $"globomantics://hrm/documents/{documentId}",
+            Uri = ResourceBenefitPlanDocumentUri.Replace("{documentId}", documentId),
         };
     }
 }

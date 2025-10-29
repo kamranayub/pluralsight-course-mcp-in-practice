@@ -7,10 +7,13 @@ using ModelContextProtocol.Server;
 
 namespace Globomantics.Mcp.Server.Calendar;
 
-public class CalendarResources
+[McpServerResourceType]
+public static class CalendarResources
 {
+    public const string ResourceWorkCalendarUri = "globomantics://hrm/calendars/work";
+     
     [McpServerResource(
-        UriTemplate = "globomantics://hrm/calendars/work",
+        UriTemplate = ResourceWorkCalendarUri,
         Name = "work-calendars.json",
         Title = "Work Holiday Calendars",
         MimeType = "application/json")]

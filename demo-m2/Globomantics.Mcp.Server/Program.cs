@@ -26,8 +26,7 @@ builder.Logging.AddConsole(consoleLogOptions =>
 
 builder.Services.AddMcpServer()
     .WithStdioServerTransport()
-    .WithResources<CalendarResources>()
-    .WithResources<DocumentResources>();
+    .WithResourcesFromAssembly();
 
 // Register HRM document service to connect to Azure Blob Storage
 builder.Services
