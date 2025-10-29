@@ -1,20 +1,11 @@
 {
     "servers": {
-        "azure-mcp-server": {
-            "command": "npx",
-            "args": [
-                "-y",
-                "@azure/mcp@latest",
-                "server",
-                "start"
-            ]
-        },
         "globomantics-mcp-server": {
             "command": "dotnet",
             "args": [
                 "run",
                 "--project",
-                "E:\\Development\\Contrib\\pluralsight-mcp-in-practice\\demo-m2\\Globomantics.Mcp.Server\\Globomantics.Mcp.Server.csproj"
+                "${workspaceFolder}/Globomantics.Mcp.Server/Globomantics.Mcp.Server.csproj"
             ]
         }
     }
