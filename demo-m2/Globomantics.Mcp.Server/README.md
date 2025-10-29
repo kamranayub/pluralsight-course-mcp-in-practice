@@ -1,5 +1,57 @@
 # Globomantics MCP Server
 
+## Local Development
+
+Set up for each client below:
+
+<details>
+<summary>VS Code</summary>
+
+See `.vscode/mcp.json`
+
+</details>
+
+<details> 
+<summary>Claude Desktop</summary>
+
+**claude_desktop_config.json**
+
+```
+{
+  "preferences": {
+    "menuBarEnabled": false,
+    "legacyQuickEntryEnabled": false
+  },
+  "mcpServers": {
+    "globomantics-mcp-server": {
+      "command": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "path/to/Globomantics.Mcp.Server/Globomantics.Mcp.Server.csproj"
+      ]
+    }
+  }
+}
+```
+</details>
+
+> [!WARNING]
+> Using `dotnet run` runs in Debug mode, which is the same output folder as `dotnet build` (`bin\Debug\net8.0`). You will get file lock/permission errors if you try to run both commands.
+>
+>  Using debug configuration is easier to attach to for debugging but you'll need to remember to either a) stop the MCP server manually in the client or b) exit the client completely (as in the case of Claude Desktop). You could also use the `-c Release` configuration flag to output to `bin\Release\net8.0` instead but you'll lose debug symbols.
+
+## Commands
+
+### `npm start`
+
+Starts the .NET MCP server using `dotnet run` command.
+
+### `npm run dev`
+
+Starts the MCP inspector using the default `mcp.json` config file.
+
+
 ## Secrets
 
 You will need to configure secrets to run this MCP server and have the required Azure resources set-up:
@@ -22,16 +74,6 @@ dotnet user-secrets set "MCP_SERVER_AAD_CLIENT_ID" "<client_secret>"
 > [!WARNING]
 > The .NET user secrets store is **not secure** and stores values in plain-text in your user profile folder.
 > For production apps, you would want to [use something like Azure KeyVault](https://learn.microsoft.com/en-us/aspnet/core/security/key-vault-configuration?view=aspnetcore-9.0)
-
-## Commands
-
-### `npm start`
-
-Starts the .NET MCP server using `dotnet run` command.
-
-### `npm run dev`
-
-Starts the MCP inspector using the default `mcp.json` config file.
 
 ## Azure Configuration
 
