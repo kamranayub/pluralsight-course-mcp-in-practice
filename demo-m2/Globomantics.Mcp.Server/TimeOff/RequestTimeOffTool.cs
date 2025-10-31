@@ -78,7 +78,7 @@ public class RequestTimeOffTool
                 day.DayType == TimeOffDayType.HalfDayMorning ? "08:00" : "12:00",
                 day.Date.ToString("yyyy-MM-dd"),
                 day.DayType == TimeOffDayType.HalfDayMorning ? "12:00" : "17:00",
-                1.0,
+                day.DayType == TimeOffDayType.FullDay ? 1.0 : 0.5,
                 absenceType
             )
         ).ToList();
