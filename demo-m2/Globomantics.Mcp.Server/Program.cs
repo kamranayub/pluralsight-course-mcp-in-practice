@@ -1,5 +1,6 @@
 ﻿using Azure.Core;
 using Azure.Identity;
+using Azure.Search.Documents;
 using Azure.Storage.Blobs;
 using Globomantics.Mcp.Server.Documents;
 using Globomantics.Mcp.Server.TimeOff;
@@ -29,11 +30,17 @@ builder.Services.AddMcpServer()
     .WithToolsFromAssembly();
 
 // Register HRM document service to connect to Azure Blob Storage
+var azureCredential = new DefaultAzureCredential();
 builder.Services
     .AddSingleton(_ => new BlobServiceClient(
         new Uri("https://psmcpdemo.blob.core.windows.net/"),
-        new DefaultAzureCredential()))
+        azureCredential))
     .AddSingleton<IHrmDocumentService, HrmDocumentService>();
+
+builder.Services.AddSingleton(_ => new SearchClient(
+        new Uri("https://psdemo.search.windows.net"),
+        "rag-globomantics-hrm",
+        azureCredential));
 
 builder.Services.AddSingleton(_ =>
 {

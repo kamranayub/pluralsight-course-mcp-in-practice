@@ -1,6 +1,4 @@
 using System.ComponentModel;
-using System.Net.Mail;
-using System.Text;
 using System.Text.Json;
 using Globomantics.Mcp.Server.Calendar;
 using Globomantics.Mcp.Server.Documents;
