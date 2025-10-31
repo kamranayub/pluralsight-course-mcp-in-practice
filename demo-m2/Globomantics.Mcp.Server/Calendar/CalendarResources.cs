@@ -39,8 +39,15 @@ public static class CalendarResources
     public static async Task<string> EmployeeCalendarResource(string employeeId, IHrmAbsenceApi hrmAbsenceApi, CancellationToken cancellationToken)
     {
         var employeeTimeOff = await hrmAbsenceApi.GetWorkerPlannedTimeOffAsync(employeeId, "json", cancellationToken);
-
-        return JsonSerializer.Serialize(employeeTimeOff, McpJsonUtilities.DefaultOptions);
+        var plannedTimeOff = new PlannedTimeOff(
+            Days: [.. employeeTimeOff.PlannedTimeOff.PlannedDays.Select(d => new PlannedTimeOffDay(
+                Date: DateTime.Parse(d.Date),
+                DayType: d.DailyQuantity == 1 ? TimeOffDayType.FullDay : d.Start == "08:00" ? TimeOffDayType.HalfDayMorning : TimeOffDayType.HalfDayAfternoon,
+                TimeOffType: d.TimeOffType.ToTimeOffRequestType()
+            ))]
+        );
+        
+        return JsonSerializer.Serialize(plannedTimeOff, McpJsonUtilities.DefaultOptions);
     }
 
     public const string ResourceWorkByLocationCalendarUri = "globomantics://hrm/calendars/work/{year}/{location}";
@@ -105,3 +112,7 @@ public record AnnualHolidayCalendar(int Year, WorkHoliday[] Holidays)
         ];
     }
 }
+
+public record PlannedTimeOff(PlannedTimeOffDay[] Days);
+
+public record PlannedTimeOffDay(DateTime Date, TimeOffDayType DayType, TimeOffRequestType TimeOffType);

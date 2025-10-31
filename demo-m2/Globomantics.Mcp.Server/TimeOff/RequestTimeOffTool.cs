@@ -7,14 +7,9 @@ using ModelContextProtocol.Server;
 namespace Globomantics.Mcp.Server.TimeOff;
 
 [McpServerToolType]
-public class RequestTimeOffTool
+public class RequestTimeOffTool(IHrmAbsenceApi hrmAbsenceApi)
 {
-    public RequestTimeOffTool(IHrmAbsenceApi hrmAbsenceApi)
-    {
-        this.hrmAbsenceApi = hrmAbsenceApi;
-    }
-
-    private readonly IHrmAbsenceApi hrmAbsenceApi;
+    private readonly IHrmAbsenceApi hrmAbsenceApi = hrmAbsenceApi;
 
     [McpServerTool(UseStructuredContent = true, Title = "Request Time Off"),
     Description($"""
@@ -56,17 +51,8 @@ public class RequestTimeOffTool
     private TimeOffRequest BuildTimeOffRequestFromSimpleRequest(SimpleTimeOffRequest request, List<AbsenceType> eligibleAbsenceTypes)
     {
 
-        var absenceType = request.TimeOffType switch
-        {
-            TimeOffRequestType.Vacation => eligibleAbsenceTypes.FirstOrDefault(t => t.Name == "VACATION"),
-            TimeOffRequestType.PersonalHoliday => eligibleAbsenceTypes.FirstOrDefault(t => t.Name == "FLEX_DAY"),
-            TimeOffRequestType.SickDay => eligibleAbsenceTypes.FirstOrDefault(t => t.Name == "SICK_LEAVE"),
-            TimeOffRequestType.MedicalOrFMLALeave => eligibleAbsenceTypes.FirstOrDefault(t => t.Name == "MEDICAL_LEAVE"),
-            TimeOffRequestType.PersonalLeaveOfAbsence => eligibleAbsenceTypes.FirstOrDefault(t => t.Name == "LEAVE_OF_ABSENCE"),
-            TimeOffRequestType.Sabbatical => eligibleAbsenceTypes.FirstOrDefault(t => t.Name == "X_00SABBATICAL"),
-            _ => throw new ArgumentOutOfRangeException(nameof(request.TimeOffType), request.TimeOffType,
-                $"Could not determine the time off type. Acceptable values are: {string.Join(", ", Enum.GetNames<TimeOffRequestType>())}")
-        };
+        var absenceType = eligibleAbsenceTypes.FirstOrDefault(at =>
+            at.Name == request.TimeOffType.ToAbsenceTypeCode());
 
         if (absenceType == null)
         {
@@ -87,16 +73,6 @@ public class RequestTimeOffTool
             timeOffDays
         );
     }
-}
-
-public enum TimeOffRequestType
-{
-    Vacation,
-    PersonalHoliday,
-    SickDay,
-    MedicalOrFMLALeave,
-    PersonalLeaveOfAbsence,
-    Sabbatical
 }
 
 public enum TimeOffDayType
