@@ -17,6 +17,7 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="9.0.10" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.9" />
     <PackageReference Include="ModelContextProtocol" Version="0.4.0-preview.3" />
+    <PackageReference Include="PdfPig" Version="0.1.11" />
     <PackageReference Include="RestEase" Version="1.6.4" />
   </ItemGroup>
 

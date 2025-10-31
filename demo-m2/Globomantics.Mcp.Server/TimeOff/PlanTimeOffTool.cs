@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Net.Mail;
+using System.Text;
 using System.Text.Json;
 using Globomantics.Mcp.Server.Calendar;
 using Globomantics.Mcp.Server.Documents;
@@ -23,6 +24,8 @@ public class PlanTimeOffTool(IHrmAbsenceApi hrmAbsenceApi, IHrmDocumentService h
         This will help you avoid scheduling time off during company holidays or overlapping with existing time off.
         This can also help answer questions about upcoming work holidays for the current year.
         You can use this tool to answer questions about time off, absence, and leave policies.
+        If the tool result is not supported or is missing policy information, NEVER try to assume and inform the user that you cannot provide an answer,
+        and that they may need to contact HR for further assistance.
         """)]
     public async Task<IEnumerable<ContentBlock>> PlanTimeOff(
         [Description("Provided by the user")] string employeeId,
@@ -31,7 +34,9 @@ public class PlanTimeOffTool(IHrmAbsenceApi hrmAbsenceApi, IHrmDocumentService h
         var employeeCalendarResource = await CalendarResources.EmployeeCalendarResource(employeeId, hrmAbsenceApi, cancellationToken);
         var employeeDetails = await hrmAbsenceApi.GetWorkerByIdAsync(employeeId, cancellationToken);
         var eligibility = await hrmAbsenceApi.GetEligibleAbsenceTypesAsync(employeeId, "not_used", cancellationToken);
-        // var timeOffPolicyDocumentResource = await DocumentResources.DocumentResourceById("Globomantics_Vacation_TimeOff_Policy.pdf", hrmDocumentService, cancellationToken);
+        // var timeOffPolicyDocumentResource = await DocumentResources.DocumentResourceById(
+        //     "Globomantics_Vacation_TimeOff_Policy.pdf", hrmDocumentService, cancellationToken);
+        var documentData = await hrmDocumentService.GetBenefitPlanDocumentContentAsPlainTextAsync("Globomantics_Vacation_TimeOff_Policy.pdf", cancellationToken);
 
         return [
             new TextContentBlock
@@ -62,19 +67,26 @@ public class PlanTimeOffTool(IHrmAbsenceApi hrmAbsenceApi, IHrmDocumentService h
             },
             new TextContentBlock
             {
-                Text = $"The employee is eligible for the following types of time off: {
+                Text = $"The employee meets all eligibility requirements and can request these types of time off: {
                     string.Join(", ", eligibility.AbsenceTypes.Select(at => at.ToTimeOffRequestType()))}"
             },
             new TextContentBlock
             {
-                Text = "You can find the Globomantics Time Off Policy document linked below:"
+                Text = "The Globomantics Time Off Policy details are below:"
             },
-            new ResourceLinkBlock
+            // new ResourceLinkBlock
+            // {
+            //     Name = "Globomantics Time Off Policy Document",
+            //     Uri = timeOffPolicyDocumentResource.Uri,
+            //     MimeType = timeOffPolicyDocumentResource.MimeType
+            // },
+            // new EmbeddedResourceBlock
+            // {
+            //     Resource = timeOffPolicyDocumentResource           
+            // },
+            new TextContentBlock
             {
-                    Name = "Globomantics_Vacation_TimeOff_Policy.pdf",
-                    Uri = DocumentResources.ResourceBenefitPlanDocumentUri
-                        .Replace("{documentId}", "Globomantics_Vacation_TimeOff_Policy.pdf"),
-                    MimeType = "application/pdf",                
+                Text = documentData
             },
         ];
     }

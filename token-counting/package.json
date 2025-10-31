@@ -1,0 +1,18 @@
+{
+  "name": "token-counting",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node --env-file=.env anthropic-token-count.mts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.68.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.9.2"
+  }
+}

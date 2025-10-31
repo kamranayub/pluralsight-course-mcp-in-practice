@@ -1,4 +1,9 @@
+using System.Text;
 using Azure.Storage.Blobs;
+using UglyToad.PdfPig;
+using UglyToad.PdfPig.Content;
+using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
+using UglyToad.PdfPig.DocumentLayoutAnalysis.WordExtractor;
 
 namespace Globomantics.Mcp.Server.Documents;
 
@@ -7,6 +12,8 @@ public interface IHrmDocumentService
     Task<List<DocumentInfo>> GetBenefitPlanDocumentsAsync(CancellationToken cancellationToken);
 
     Task<string?> GetBenefitPlanDocumentContentAsync(string documentId, CancellationToken cancellationToken);
+
+    Task<string> GetBenefitPlanDocumentContentAsPlainTextAsync(string documentId, CancellationToken cancellationToken);
 }
 
 public class HrmDocumentService : IHrmDocumentService
@@ -60,6 +67,38 @@ public class HrmDocumentService : IHrmDocumentService
         var downloadResult = await blobClient.DownloadContentAsync(cancellationToken);
 
         return Convert.ToBase64String(downloadResult.Value.Content);
+    }
+
+    public async Task<string> GetBenefitPlanDocumentContentAsPlainTextAsync(string documentId, CancellationToken cancellationToken)
+    {
+        var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+        var blobClient = containerClient.GetBlobClient(documentId);
+
+        var exists = await blobClient.ExistsAsync(cancellationToken);
+
+        if (exists.Value == false)
+        {
+            return "";
+        }
+
+        var downloadResult = await blobClient.DownloadContentAsync(cancellationToken);
+        using var stream = downloadResult.Value.Content.ToStream();
+        using PdfDocument document = PdfDocument.Open(stream);
+
+        var pdfText = new StringBuilder();
+        foreach (Page page in document.GetPages())
+        {
+            string text = ContentOrderTextExtractor.GetText(page);
+            IEnumerable<Word> words = page.GetWords(NearestNeighbourWordExtractor.Instance);
+
+            foreach (var word in words)
+            {
+                pdfText.Append(word.Text);
+                pdfText.Append(' ');
+            }
+        }
+        
+        return pdfText.ToString();
     }
 }
 
