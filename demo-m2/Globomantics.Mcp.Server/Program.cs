@@ -27,7 +27,8 @@ builder.Logging.AddConsole(consoleLogOptions =>
 builder.Services.AddMcpServer()
     .WithStdioServerTransport()
     .WithResourcesFromAssembly()
-    .WithToolsFromAssembly();
+    .WithToolsFromAssembly()
+    .WithPromptsFromAssembly();
 
 // Register HRM document service to connect to Azure Blob Storage
 var azureCredential = new DefaultAzureCredential();
