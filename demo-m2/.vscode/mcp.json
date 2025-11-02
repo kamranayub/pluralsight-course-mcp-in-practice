@@ -28,7 +28,7 @@
     }
   ],
   "servers": {
-    "globomantics-mcp-server-local": {
+    "globomantics-mcp-server": {
         "command": "dotnet",
         "args": [
             "run",
