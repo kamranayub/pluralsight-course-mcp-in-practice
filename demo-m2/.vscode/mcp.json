@@ -1,12 +1,52 @@
 {
-    "servers": {
-        "globomantics-mcp-server": {
-            "command": "dotnet",
-            "args": [
-                "run",
-                "--project",
-                "${workspaceFolder}/Globomantics.Mcp.Server/Globomantics.Mcp.Server.csproj"
-            ]
-        }
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "AZURE_TENANT_ID",
+      "description": "The Azure tenant ID to use for authentication"
+    },
+    {
+      "type": "promptString",
+      "id": "HRM_API_AAD_CLIENT_ID",
+      "description": "The AAD client ID for the HRM API"
+    },
+    {
+      "type": "promptString",
+      "id": "HRM_API_ENDPOINT",
+      "description": "The base URL for the HRM API"
+    },
+    {
+      "type": "promptString",
+      "id": "MCP_SERVER_AAD_CLIENT_ID",
+      "description": "The AAD client ID for the MCP server"
+    },
+    {
+      "type": "promptString",
+      "id": "MCP_SERVER_AAD_CLIENT_SECRET",
+      "description": "The AAD client secret for the MCP server",
+      "password": true
     }
+  ],
+  "servers": {
+    "globomantics-mcp-server-local": {
+        "command": "dotnet",
+        "args": [
+            "run",
+            "--project",
+            "${workspaceFolder}/Globomantics.Mcp.Server/Globomantics.Mcp.Server.csproj"
+        ]
+    },
+    "Pluralsight.Globomantics.Mcp.DemoServer": {
+      "type": "stdio",
+      "command": "dnx",
+      "args": ["Pluralsight.Globomantics.Mcp.DemoServer@0.1.0-beta", "--yes"],
+      "env": {
+        "AZURE_TENANT_ID": "${input:AZURE_TENANT_ID}",
+        "HRM_API_AAD_CLIENT_ID": "${input:HRM_API_AAD_CLIENT_ID}",
+        "HRM_API_ENDPOINT": "${input:HRM_API_ENDPOINT}",
+        "MCP_SERVER_AAD_CLIENT_ID": "${input:MCP_SERVER_AAD_CLIENT_ID}",
+        "MCP_SERVER_AAD_CLIENT_SECRET": "${input:MCP_SERVER_AAD_CLIENT_SECRET}"
+      }
+    }
+  }
 }
