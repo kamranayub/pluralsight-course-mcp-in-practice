@@ -53,4 +53,6 @@ var app = builder.Build();
 
 app.MapMcp();
 
+app.MapGet("/api/healthz", () => "Healthy");
+
 await app.RunAsync();
