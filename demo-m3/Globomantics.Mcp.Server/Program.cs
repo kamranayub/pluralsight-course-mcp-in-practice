@@ -9,7 +9,11 @@ using RestEase;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddMcpServer()
-    .WithHttpTransport()
+    .WithHttpTransport(options =>
+    {
+        // Compatibility with Azure Functions hosting model
+        options.Stateless = true;
+    })
     .WithResourcesFromAssembly()
     .WithToolsFromAssembly()
     .WithPromptsFromAssembly();
