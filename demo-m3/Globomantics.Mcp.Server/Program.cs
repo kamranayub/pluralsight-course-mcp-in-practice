@@ -4,28 +4,12 @@ using Azure.Search.Documents;
 using Azure.Storage.Blobs;
 using Globomantics.Mcp.Server.Documents;
 using Globomantics.Mcp.Server.TimeOff;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using RestEase;
 
-var builder = Host.CreateEmptyApplicationBuilder(settings: null);
-
-// Configure user secrets and env vars for local development
-builder.Configuration
-    .AddUserSecrets<Program>()
-    .AddEnvironmentVariables();
-
-// Configure all logs to go to stderr for MCP server
-builder.Logging.AddConsole(consoleLogOptions =>
-{
-    // Configure all logs to go to stderr
-    consoleLogOptions.LogToStandardErrorThreshold = LogLevel.Trace;
-});
+var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddMcpServer()
-    .WithStdioServerTransport()
+    .WithHttpTransport()
     .WithResourcesFromAssembly()
     .WithToolsFromAssembly()
     .WithPromptsFromAssembly();
@@ -62,5 +46,7 @@ builder.Services.AddSingleton(_ =>
 });
 
 var app = builder.Build();
+
+app.MapMcp();
 
 await app.RunAsync();
