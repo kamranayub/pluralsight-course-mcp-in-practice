@@ -55,4 +55,8 @@ app.MapMcp();
 
 app.MapGet("/api/healthz", () => "Healthy");
 
+// Configure for Azure Functions custom handler
+var port = Environment.GetEnvironmentVariable("FUNCTIONS_CUSTOMHANDLER_PORT") ?? "8080";
+app.Urls.Add($"http://0.0.0.0:{port}");
+
 await app.RunAsync();

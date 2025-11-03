@@ -28,4 +28,8 @@
   </Compile>
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include=".azurefunctions\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
