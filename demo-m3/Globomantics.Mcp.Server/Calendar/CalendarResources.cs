@@ -12,14 +12,24 @@ public static class CalendarResources
 {
     public const string ResourceWorkCalendarUri = "globomantics://hrm/calendars/work";
 
-    [McpServerResource(UriTemplate = ResourceWorkCalendarUri, Name = "Work Calendar", MimeType = "application/json")]
-    [Description("The current year work calendar")]
-    public static string WorkCalendarResource()
+    [McpServerResource(
+        UriTemplate = ResourceWorkCalendarUri,
+        Name = "work-calendars.json",
+        Title = "Work Holiday Calendars",
+        MimeType = "application/json")]
+    [Description("Returns the holiday calendars for different work locations (United States and India).")]
+    public static string WorkCalendarsResource()
     {
         var usCalendar = AnnualHolidayCalendar.CreateForYear(DateTime.Now.Year, WorkLocation.UnitedStates);
         var inCalendar = AnnualHolidayCalendar.CreateForYear(DateTime.Now.Year, WorkLocation.India);
 
-        return JsonSerializer.Serialize(new { US = usCalendar, IN = inCalendar }, McpJsonUtilities.DefaultOptions);
+        var workCalendarResource = new
+        {
+            US = usCalendar,
+            IN = inCalendar
+        };
+
+        return JsonSerializer.Serialize(workCalendarResource, McpJsonUtilities.DefaultOptions);
     }
 
     public const string ResourceEmployeeCalendarUri = "globomantics://hrm/calendars/employee/{employeeId}";
@@ -29,8 +39,15 @@ public static class CalendarResources
     public static async Task<string> EmployeeCalendarResource(string employeeId, IHrmAbsenceApi hrmAbsenceApi, CancellationToken cancellationToken)
     {
         var employeeTimeOff = await hrmAbsenceApi.GetWorkerPlannedTimeOffAsync(employeeId, "json", cancellationToken);
-
-        return JsonSerializer.Serialize(employeeTimeOff, McpJsonUtilities.DefaultOptions);
+        var plannedTimeOff = new PlannedTimeOff(
+            Days: [.. employeeTimeOff.PlannedTimeOff.PlannedDays.Select(d => new PlannedTimeOffDay(
+                Date: DateTime.Parse(d.Date),
+                DayType: d.DailyQuantity == 1 ? TimeOffDayType.FullDay : d.Start == "08:00" ? TimeOffDayType.HalfDayMorning : TimeOffDayType.HalfDayAfternoon,
+                TimeOffType: d.TimeOffType.ToTimeOffRequestType()
+            ))]
+        );
+        
+        return JsonSerializer.Serialize(plannedTimeOff, McpJsonUtilities.DefaultOptions);
     }
 
     public const string ResourceWorkByLocationCalendarUri = "globomantics://hrm/calendars/work/{year}/{location}";
@@ -95,3 +112,7 @@ public record AnnualHolidayCalendar(int Year, WorkHoliday[] Holidays)
         ];
     }
 }
+
+public record PlannedTimeOff(PlannedTimeOffDay[] Days);
+
+public record PlannedTimeOffDay(DateTime Date, TimeOffDayType DayType, TimeOffRequestType TimeOffType);

@@ -16,7 +16,7 @@ dotnet user-secrets set "HRM_API_AAD_CLIENT_ID" "<client_id>"
 # Azure Entra application ID for the MCP Server (S2S auth)
 dotnet user-secrets set "MCP_SERVER_AAD_CLIENT_ID" "<client_id>"
 # Azure Entra client secret credential value for MCP Server (S2S auth)
-dotnet user-secrets set "MCP_SERVER_AAD_CLIENT_ID" "<client_secret>"
+dotnet user-secrets set "MCP_SERVER_AAD_CLIENT_SECRET" "<client_secret>"
 ```
 
 > [!WARNING]
@@ -80,6 +80,16 @@ Copy and paste into `dotnet run` stdin:
 ```
 
 If there's a response, the server is working!
+
+## Client Compatibility
+
+### Claude Desktop
+
+- Does not support Resource Templates (have to expose a tool)
+
+### Visual Studio Code
+
+- Will not display resources until a tool is available
 
 ## Notes
 

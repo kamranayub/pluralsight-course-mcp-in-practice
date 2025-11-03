@@ -11,7 +11,7 @@ namespace Globomantics.Mcp.Server.Calendar;
 public static class CalendarResources
 {
     public const string ResourceWorkCalendarUri = "globomantics://hrm/calendars/work";
-     
+
     [McpServerResource(
         UriTemplate = ResourceWorkCalendarUri,
         Name = "work-calendars.json",
