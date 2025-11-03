@@ -1,33 +1,42 @@
-﻿using RestEase;
-using Azure.Core;
+﻿using Azure.Core;
 using Azure.Identity;
-using Azure.Storage.Blobs;
-using Globomantics.Mcp.Server.TimeOff;
-using Globomantics.Mcp.Server.Documents;
 using Azure.Search.Documents;
+using Azure.Storage.Blobs;
+using Globomantics.Mcp.Server.Documents;
+using Globomantics.Mcp.Server.TimeOff;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using RestEase;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = Host.CreateEmptyApplicationBuilder(settings: null);
 
-// Configure port for Azure Functions custom handler
-var port = Environment.GetEnvironmentVariable("FUNCTIONS_CUSTOMHANDLER_PORT") ?? "5000";
-builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+// Configure user secrets and env vars for local development
+builder.Configuration
+    .AddUserSecrets<Program>()
+    .AddEnvironmentVariables();
 
-// Configure MCP server
+// Configure all logs to go to stderr for MCP server
+builder.Logging.AddConsole(consoleLogOptions =>
+{
+    // Configure all logs to go to stderr
+    consoleLogOptions.LogToStandardErrorThreshold = LogLevel.Trace;
+});
+
 builder.Services.AddMcpServer()
-    .WithHttpTransport(options =>
-    {
-        // In the Advanced MCP course, we will discuss stateful vs stateless MCP servers
-        options.Stateless = true;
-    })
+    .WithStdioServerTransport()
     .WithResourcesFromAssembly()
     .WithToolsFromAssembly()
     .WithPromptsFromAssembly();
 
-// Configure Azure clients and services
+// Register HRM document service to connect to Azure Blob Storage
 var azureCredential = new DefaultAzureCredential();
-builder.Services.AddSingleton(_ => new BlobServiceClient(
+builder.Services
+    .AddSingleton(_ => new BlobServiceClient(
         new Uri("https://psmcpdemo.blob.core.windows.net/"),
-        azureCredential));
+        azureCredential))
+    .AddSingleton<IHrmDocumentService, HrmDocumentService>();
 
 builder.Services.AddSingleton(_ => new SearchClient(
         new Uri("https://psdemo.search.windows.net"),
@@ -52,12 +61,6 @@ builder.Services.AddSingleton(_ =>
             });
 });
 
-builder.Services.AddSingleton<IHrmDocumentService, HrmDocumentService>();
-
 var app = builder.Build();
-
-app.MapGet("/api/healthz", () => "Healthy");
-
-app.MapMcp();
 
 await app.RunAsync();

@@ -5,8 +5,7 @@
   "description": "MCP server for Globomantics",
   "scripts": {
     "start": "dotnet run",
-    "dev": "npx @modelcontextprotocol/inspector --config mcp.json --server globomantics-hrm",
-    "prod": "npx @modelcontextprotocol/inspector --config mcp.json --server globomantics-hrm-prod"
+    "dev": "npx @modelcontextprotocol/inspector dotnet run"
   },
   "keywords": [],
   "author": "Kamran Ayub",
