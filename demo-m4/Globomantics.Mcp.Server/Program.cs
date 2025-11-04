@@ -10,6 +10,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Configure for Azure Functions custom handler
 var port = Environment.GetEnvironmentVariable("FUNCTIONS_CUSTOMHANDLER_PORT") ?? "5000";
+var serverUrl = Environment.GetEnvironmentVariable("WEBSITE_HOSTNAME") != null
+    ? $"https://{Environment.GetEnvironmentVariable("WEBSITE_HOSTNAME")}"
+    : $"http://localhost:{port}";
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
 builder.Services.AddMcpServer()
