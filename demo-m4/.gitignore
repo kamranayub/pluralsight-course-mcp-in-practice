@@ -13,7 +13,6 @@ pids/
 *.pid
 *.seed
 *.pid.lock
-mcp.azure.json
 
 # Build results
 bin/
