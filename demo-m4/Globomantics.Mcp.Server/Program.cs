@@ -4,13 +4,40 @@ using Azure.Search.Documents;
 using Azure.Storage.Blobs;
 using Globomantics.Mcp.Server.Documents;
 using Globomantics.Mcp.Server.TimeOff;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using ModelContextProtocol.AspNetCore.Authentication;
 using RestEase;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Configure for Azure Functions custom handler
 var port = Environment.GetEnvironmentVariable("FUNCTIONS_CUSTOMHANDLER_PORT") ?? "5000";
+var serverUrl = Environment.GetEnvironmentVariable("WEBSITE_HOSTNAME") != null
+    ? $"https://{Environment.GetEnvironmentVariable("WEBSITE_HOSTNAME")}"
+    : $"http://localhost:{port}";
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultChallengeScheme = McpAuthenticationDefaults.AuthenticationScheme;
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+}).AddMcp(options =>
+{
+    var tenantId = builder.Configuration["AZURE_TENANT_ID"];
+    var aadOAuthServerUrl = $"https://login.microsoftonline.com/{tenantId}/v2.0";
+    var mcpClientId = builder.Configuration["MCP_SERVER_AAD_CLIENT_ID"];
+
+    options.ResourceMetadata = new()
+    {
+        Resource = new Uri(serverUrl),
+        ResourceDocumentation = new Uri("https://globomantics.com/mcp"),
+        AuthorizationServers = { new Uri(aadOAuthServerUrl) },
+        ScopesSupported = [$"api://{mcpClientId}/user_impersonation"],
+    };
+});
+
+// Add authorization support
+builder.Services.AddAuthorization();
 
 builder.Services.AddMcpServer()
     .WithHttpTransport(options =>
@@ -55,9 +82,11 @@ builder.Services.AddSingleton(_ =>
 
 var app = builder.Build();
 
-app.MapMcp();
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapMcp().RequireAuthorization();
 
 app.MapGet("/api/healthz", () => "Healthy");
-
 
 await app.RunAsync();
