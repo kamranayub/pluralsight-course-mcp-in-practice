@@ -32,7 +32,7 @@ public class PlanTimeOffTool(IHrmAbsenceApi hrmAbsenceApi, IHrmDocumentService h
         var employeeIdResponse = await hrmAbsenceApi.GetAuthenticatedUserIdAsync(cancellationToken);
         var employeeId = employeeIdResponse.EmployeeId;
 
-        var employeeCalendarResource = await CalendarResources.EmployeeCalendarResource(employeeId, hrmAbsenceApi, cancellationToken);
+        var employeeCalendarResource = await CalendarResources.EmployeeCalendarResource(hrmAbsenceApi, cancellationToken);
         var employeeDetails = await hrmAbsenceApi.GetWorkerByIdAsync(employeeId, cancellationToken);
         var eligibility = await hrmAbsenceApi.GetEligibleAbsenceTypesAsync(employeeId, "not_used", cancellationToken);
         var documentData = await hrmDocumentService.GetBenefitPlanDocumentContentAsPlainTextAsync("Globomantics_Vacation_TimeOff_Policy.pdf", cancellationToken);
