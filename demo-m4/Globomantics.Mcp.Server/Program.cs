@@ -21,6 +21,15 @@ var serverUrl = builder.Environment.IsProduction() || builder.Environment.IsStag
     ? $"https://{Environment.GetEnvironmentVariable("WEBSITE_HOSTNAME")}"
     : $"http://{Environment.GetEnvironmentVariable("WEBSITE_HOSTNAME")}";
 
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders =
+      ForwardedHeaders.XForwardedHost |
+      ForwardedHeaders.XForwardedProto;
+
+    options.ForwardLimit = 1;
+});
+
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultChallengeScheme = McpAuthenticationDefaults.AuthenticationScheme;
@@ -129,6 +138,7 @@ builder.Services.AddSingleton(_ =>
 
 var app = builder.Build();
 
+app.UseForwardedHeaders();
 app.UseAuthentication();
 app.UseAuthorization();
 
