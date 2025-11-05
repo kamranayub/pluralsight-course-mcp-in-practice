@@ -2,7 +2,7 @@
   "mcpServers": {
     "globomantics-hrm": {
       "type": "streamable-http",
-      "url": "http://localhost:5000/"
+      "url": "http://localhost:7071/"
     },
     "globomantics-hrm-prod": {
       "type": "streamable-http",

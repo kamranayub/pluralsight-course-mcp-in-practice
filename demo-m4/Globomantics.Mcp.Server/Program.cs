@@ -1,10 +1,13 @@
-﻿using Azure.Core;
+﻿using System.Security.Claims;
+using Azure.Core;
 using Azure.Identity;
 using Azure.Search.Documents;
 using Azure.Storage.Blobs;
 using Globomantics.Mcp.Server.Documents;
 using Globomantics.Mcp.Server.TimeOff;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.IdentityModel.Tokens;
 using ModelContextProtocol.AspNetCore.Authentication;
 using RestEase;
 
@@ -12,16 +15,60 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Configure for Azure Functions custom handler
 var port = Environment.GetEnvironmentVariable("FUNCTIONS_CUSTOMHANDLER_PORT") ?? "5000";
-var serverUrl = Environment.GetEnvironmentVariable("WEBSITE_HOSTNAME") != null
-    ? $"https://{Environment.GetEnvironmentVariable("WEBSITE_HOSTNAME")}"
-    : $"http://localhost:{port}";
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+
+var serverUrl = builder.Environment.IsProduction() || builder.Environment.IsStaging()
+    ? $"https://{Environment.GetEnvironmentVariable("WEBSITE_HOSTNAME")}"
+    : $"http://{Environment.GetEnvironmentVariable("WEBSITE_HOSTNAME")}";
 
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultChallengeScheme = McpAuthenticationDefaults.AuthenticationScheme;
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-}).AddMcp(options =>
+})
+.AddJwtBearer(options =>
+{
+    var tenantId = builder.Configuration["AZURE_TENANT_ID"];
+    var azureIssuerUrl = $"https://sts.windows.net/{tenantId}/";
+    var mcpClientId = builder.Configuration["MCP_SERVER_AAD_CLIENT_ID"];
+
+    options.Authority = azureIssuerUrl;
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidIssuer = azureIssuerUrl,
+        ValidateAudience = true,
+        ValidAudiences = [mcpClientId, $"api://{mcpClientId}"],
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        NameClaimType = "name",
+        RoleClaimType = "roles"
+    };
+
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = context =>
+        {
+            var authToken = context.HttpContext.Request.Headers.Authorization.ToString().Replace("Bearer ", "");
+            var name = context.Principal?.Identity?.Name ?? "unknown";
+            var email = context.Principal?.FindFirstValue(ClaimTypes.Email) ?? "unknown";
+            Console.WriteLine($"Token validated for: {name} ({email})");
+            return Task.CompletedTask;
+        },
+        OnAuthenticationFailed = context =>
+        {
+            Console.WriteLine($"Authentication failed: {context.Exception.Message}");
+            return Task.CompletedTask;
+        },
+        OnChallenge = context =>
+        {
+            Console.WriteLine($"Challenging client to authenticate with Entra ID");
+
+            return Task.CompletedTask;
+        }
+    };
+})
+.AddMcp(options =>
 {
     var tenantId = builder.Configuration["AZURE_TENANT_ID"];
     var aadOAuthServerUrl = $"https://login.microsoftonline.com/{tenantId}/v2.0";
