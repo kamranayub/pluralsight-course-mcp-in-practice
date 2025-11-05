@@ -120,8 +120,20 @@ builder.Services.AddMcpServer()
     .WithToolsFromAssembly()
     .WithPromptsFromAssembly();
 
-// Register HRM document service to connect to Azure Blob Storage
-var azureCredential = new DefaultAzureCredential();
+// Configure Azure clients and services
+TokenCredential azureCredential;
+
+if (builder.Environment.IsProduction() || builder.Environment.IsStaging())
+{
+    azureCredential = new ManagedIdentityCredential(
+        ManagedIdentityId.FromUserAssignedClientId(builder.Configuration["AZURE_CLIENT_ID"]));
+}
+else
+{
+    // local development environment
+    azureCredential = new DefaultAzureCredential();
+}
+
 builder.Services
     .AddSingleton(_ => new BlobServiceClient(
         new Uri("https://psmcpdemo.blob.core.windows.net/"),
