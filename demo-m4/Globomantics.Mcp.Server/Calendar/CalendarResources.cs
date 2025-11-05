@@ -32,13 +32,14 @@ public static class CalendarResources
         return JsonSerializer.Serialize(workCalendarResource, McpJsonUtilities.DefaultOptions);
     }
 
-    public const string ResourceEmployeeCalendarUri = "globomantics://hrm/calendars/employee/{employeeId}";
+    public const string ResourceEmployeeCalendarUri = "globomantics://hrm/calendars/employee";
 
     [McpServerResource(UriTemplate = ResourceEmployeeCalendarUri, Name = "Employee Calendar", MimeType = "application/json")]
     [Description("The current employee's planned time-off calendar")]
-    public static async Task<string> EmployeeCalendarResource(string employeeId, IHrmAbsenceApi hrmAbsenceApi, CancellationToken cancellationToken)
+    public static async Task<string> EmployeeCalendarResource(IHrmAbsenceApi hrmAbsenceApi, CancellationToken cancellationToken)
     {
-        var employeeTimeOff = await hrmAbsenceApi.GetWorkerPlannedTimeOffAsync(employeeId, "json", cancellationToken);
+        var employeeIdResponse = await hrmAbsenceApi.GetAuthenticatedUserIdAsync(cancellationToken);
+        var employeeTimeOff = await hrmAbsenceApi.GetWorkerPlannedTimeOffAsync(employeeIdResponse.EmployeeId, "json", cancellationToken);
         var plannedTimeOff = new PlannedTimeOff(
             Days: [.. employeeTimeOff.PlannedTimeOff.PlannedDays.Select(d => new PlannedTimeOffDay(
                 Date: DateTime.Parse(d.Date),

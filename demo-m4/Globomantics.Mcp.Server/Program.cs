@@ -74,7 +74,6 @@ builder.Services.AddAuthentication(options =>
     {
         OnTokenValidated = context =>
         {
-            var authToken = context.HttpContext.Request.Headers.Authorization.ToString().Replace("Bearer ", "");
             var name = context.Principal?.Identity?.Name ?? "unknown";
             var email = context.Principal?.FindFirstValue(ClaimTypes.Email) ?? "unknown";
             Console.WriteLine($"Token validated for: {name} ({email})");
@@ -134,20 +133,28 @@ builder.Services.AddSingleton(_ => new SearchClient(
         "rag-globomantics-hrm",
         azureCredential));
 
-builder.Services.AddSingleton(_ =>
+// Allow accessing HttpContext in services
+builder.Services.AddHttpContextAccessor();
+
+builder.Services.AddSingleton(services =>
 {
-    // For stdio, use client credential flow to call HRM API as MCP server identity
+    // This is using an OBO (On-Behalf-Of) flow to call the HRM API on behalf of the signed-in user
+    // It does not use passwordless authentication or managed identity, but instead exchanges
+    // the user's access token for a new access token to call the HRM API using the MCP client secret credential
     var tenantId = builder.Configuration["AZURE_TENANT_ID"];
     var mcpClientId = builder.Configuration["MCP_SERVER_AAD_CLIENT_ID"];
     var mcpClientSecret = builder.Configuration["MCP_SERVER_AAD_CLIENT_SECRET"];
     var hrmEndpoint = builder.Configuration["HRM_API_ENDPOINT"];
     var hrmAppId = builder.Configuration["HRM_API_AAD_CLIENT_ID"];
-    var hrmClientSecretCredential = new ClientSecretCredential(tenantId, mcpClientId, mcpClientSecret);
 
     return RestClient.For<IHrmAbsenceApi>(hrmEndpoint, async (request, cancellationToken) =>
             {
-                var token = await hrmClientSecretCredential.GetTokenAsync(
-                    new TokenRequestContext([$"api://{hrmAppId}/.default"]), cancellationToken);
+                var httpContext = services.GetRequiredService<IHttpContextAccessor>().HttpContext ?? throw new InvalidOperationException("No HttpContext available to acquire user token.");
+                var userAccessToken = httpContext.Request.Headers.Authorization.ToString().Replace("Bearer ", "");
+                var hrmOboCredential = new OnBehalfOfCredential(tenantId, mcpClientId, mcpClientSecret, userAccessToken);
+
+                var token = await hrmOboCredential.GetTokenAsync(
+                    new TokenRequestContext([$"api://{hrmAppId}/user_impersonation"]), cancellationToken);
                 request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Token);
             });
 });

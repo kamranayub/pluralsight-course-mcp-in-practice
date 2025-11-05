@@ -22,10 +22,12 @@ public class RequestTimeOffTool(IHrmAbsenceApi hrmAbsenceApi)
     Remind the employee if they are requesting a Personal Holiday that there is a limit to how many they can take per year per company policy.
     Before calling, make sure to summarize the dates and requested time off type clearly.
     """)]
-    public async Task<TimeOffResponse> RequestTimeOff(string employeeId, SimpleTimeOffRequest request, CancellationToken cancellationToken)
+    public async Task<TimeOffResponse> RequestTimeOff(SimpleTimeOffRequest request, CancellationToken cancellationToken)
     {
         try
         {
+            var employeeIdResponse = await hrmAbsenceApi.GetAuthenticatedUserIdAsync(cancellationToken);
+            var employeeId = employeeIdResponse.EmployeeId;
             var eligibleAbsenceTypes = await hrmAbsenceApi.GetEligibleAbsenceTypesAsync(employeeId, "not_used", cancellationToken);
             var absenceRequest = BuildTimeOffRequestFromSimpleRequest(request, eligibleAbsenceTypes.AbsenceTypes);
             var response = await hrmAbsenceApi.RequestTimeOffAsync(employeeId, absenceRequest, cancellationToken);

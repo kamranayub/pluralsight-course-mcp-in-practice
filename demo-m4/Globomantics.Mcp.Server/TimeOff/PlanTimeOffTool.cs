@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Security.Claims;
 using System.Text.Json;
 using Globomantics.Mcp.Server.Calendar;
 using Globomantics.Mcp.Server.Documents;
@@ -26,9 +27,11 @@ public class PlanTimeOffTool(IHrmAbsenceApi hrmAbsenceApi, IHrmDocumentService h
         and that they may need to contact HR for further assistance.
         """)]
     public async Task<IEnumerable<ContentBlock>> PlanTimeOff(
-        [Description("Provided by the user")] string employeeId,
         CancellationToken cancellationToken)
     {
+        var employeeIdResponse = await hrmAbsenceApi.GetAuthenticatedUserIdAsync(cancellationToken);
+        var employeeId = employeeIdResponse.EmployeeId;
+
         var employeeCalendarResource = await CalendarResources.EmployeeCalendarResource(employeeId, hrmAbsenceApi, cancellationToken);
         var employeeDetails = await hrmAbsenceApi.GetWorkerByIdAsync(employeeId, cancellationToken);
         var eligibility = await hrmAbsenceApi.GetEligibleAbsenceTypesAsync(employeeId, "not_used", cancellationToken);
