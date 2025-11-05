@@ -21,6 +21,22 @@ var serverUrl = builder.Environment.IsProduction() || builder.Environment.IsStag
     ? $"https://{Environment.GetEnvironmentVariable("WEBSITE_HOSTNAME")}"
     : $"http://{Environment.GetEnvironmentVariable("WEBSITE_HOSTNAME")}";
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowInspector", policy =>
+    {
+        policy
+            .WithOrigins("http://localhost:6274") // MCP Inspector dev host
+            .WithMethods("GET", "POST", "DELETE", "OPTIONS")
+            .WithHeaders("*")                     // allow any headers
+            .WithExposedHeaders(
+                "mcp-session-id",
+                "last-event-id",
+                "mcp-protocol-version")
+            .AllowCredentials();                  // optional if you later use cookies
+    });
+});
+
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders =
@@ -137,6 +153,11 @@ builder.Services.AddSingleton(_ =>
 });
 
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseCors("AllowInspector");
+}
 
 app.UseForwardedHeaders();
 app.UseAuthentication();
