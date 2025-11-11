@@ -7,6 +7,7 @@ using Globomantics.Mcp.Server.Documents;
 using Globomantics.Mcp.Server.TimeOff;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.IdentityModel.Tokens;
 using ModelContextProtocol.AspNetCore.Authentication;
 using RestEase;
 
@@ -41,6 +42,25 @@ builder.Services
     {
         options.DefaultChallengeScheme = McpAuthenticationDefaults.AuthenticationScheme;
         options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(options =>
+    {
+        var tenantId = builder.Configuration["AZURE_TENANT_ID"];
+        var azureIssuerUrl = $"https://sts.windows.net/{tenantId}/";
+        var mcpClientId = builder.Configuration["MCP_SERVER_AAD_CLIENT_ID"];
+
+        options.Authority = azureIssuerUrl;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = azureIssuerUrl,
+            ValidateAudience = true,
+            ValidAudiences = [mcpClientId, $"api://{mcpClientId}"],
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            NameClaimType = "name",
+            RoleClaimType = "roles"
+        };
     })
     .AddMcp(options =>
     {
