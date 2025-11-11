@@ -6,6 +6,7 @@ using Azure.Storage.Blobs;
 using Globomantics.Mcp.Server.Documents;
 using Globomantics.Mcp.Server.TimeOff;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using ModelContextProtocol.AspNetCore.Authentication;
 using RestEase;
 
@@ -67,8 +68,18 @@ builder.Services.AddSingleton(_ =>
             });
 });
 
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders =
+      ForwardedHeaders.XForwardedHost |
+      ForwardedHeaders.XForwardedProto;
+
+    options.ForwardLimit = 1;
+});
+
 var app = builder.Build();
 
+app.UseForwardedHeaders();
 app.UseAuthentication();
 app.UseAuthorization();
 
