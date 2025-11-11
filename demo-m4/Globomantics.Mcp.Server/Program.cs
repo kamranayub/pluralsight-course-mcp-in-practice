@@ -6,8 +6,6 @@ using Azure.Storage.Blobs;
 using Globomantics.Mcp.Server.Documents;
 using Globomantics.Mcp.Server.TimeOff;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.IdentityModel.Tokens;
 using ModelContextProtocol.AspNetCore.Authentication;
 using RestEase;
 
@@ -15,73 +13,15 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Configure for Azure Functions custom handler
 var port = Environment.GetEnvironmentVariable("FUNCTIONS_CUSTOMHANDLER_PORT") ?? "5000";
-builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+builder.WebHost.UseUrls($"http://localhost:{port}");
 
-var serverUrl = builder.Environment.IsProduction() || builder.Environment.IsStaging()
-    ? $"https://{Environment.GetEnvironmentVariable("WEBSITE_HOSTNAME")}"
-    : $"http://{Environment.GetEnvironmentVariable("WEBSITE_HOSTNAME")}";
-
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultChallengeScheme = McpAuthenticationDefaults.AuthenticationScheme;
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(options =>
-{
-    var tenantId = builder.Configuration["AZURE_TENANT_ID"];
-    var azureIssuerUrl = $"https://sts.windows.net/{tenantId}/";
-    var mcpClientId = builder.Configuration["MCP_SERVER_AAD_CLIENT_ID"];
-
-    options.Authority = azureIssuerUrl;
-    options.TokenValidationParameters = new TokenValidationParameters
+builder.Services
+    .AddAuthentication(options =>
     {
-        ValidateIssuer = true,
-        ValidIssuer = azureIssuerUrl,
-        ValidateAudience = true,
-        ValidAudiences = [mcpClientId, $"api://{mcpClientId}"],
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        NameClaimType = "name",
-        RoleClaimType = "roles"
-    };
-
-    options.Events = new JwtBearerEvents
-    {
-        OnTokenValidated = context =>
-        {
-            var authToken = context.HttpContext.Request.Headers.Authorization.ToString().Replace("Bearer ", "");
-            var name = context.Principal?.Identity?.Name ?? "unknown";
-            var email = context.Principal?.FindFirstValue(ClaimTypes.Email) ?? "unknown";
-            Console.WriteLine($"Token validated for: {name} ({email})");
-            return Task.CompletedTask;
-        },
-        OnAuthenticationFailed = context =>
-        {
-            Console.WriteLine($"Authentication failed: {context.Exception.Message}");
-            return Task.CompletedTask;
-        },
-        OnChallenge = context =>
-        {
-            Console.WriteLine($"Challenging client to authenticate with Entra ID");
-
-            return Task.CompletedTask;
-        }
-    };
-})
-.AddMcp(options =>
-{
-    var tenantId = builder.Configuration["AZURE_TENANT_ID"];
-    var aadOAuthServerUrl = $"https://login.microsoftonline.com/{tenantId}/v2.0";
-    var mcpClientId = builder.Configuration["MCP_SERVER_AAD_CLIENT_ID"];
-
-    options.ResourceMetadata = new()
-    {
-        Resource = new Uri(serverUrl),
-        ResourceDocumentation = new Uri("https://globomantics.com/mcp"),
-        AuthorizationServers = { new Uri(aadOAuthServerUrl) },
-        ScopesSupported = [$"api://{mcpClientId}/user_impersonation"],
-    };
-});
+        options.DefaultChallengeScheme = McpAuthenticationDefaults.AuthenticationScheme;
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddMcp();
 
 // Add authorization support
 builder.Services.AddAuthorization();
