@@ -17,10 +17,10 @@ This repository is for the Pluralsight course **[Model Context Protocol in Pract
 
 Each module folder represents the end-state of the demo:
 
-- **M1:** Basic scaffolded MCP server
-- **M2:** Built-out local MCP server
-- **M3:** Deployed remote MCP server
-- **M4:** Protected MCP server
+- **demo-m1:** Basic scaffolded MCP server
+- **demo-m2:** Built-out local MCP server
+- **demo-m3:** Deployed remote MCP server
+- **demo-m4:** Protected MCP server
 
 Each one has notes in the `README.md` files you can refer to.
 
