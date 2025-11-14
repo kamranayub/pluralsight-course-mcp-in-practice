@@ -15,6 +15,18 @@ param maximumInstanceCount int = 100
 param identityId string = ''
 param identityClientId string = ''
 
+@description('The client ID of the HRM API Azure AD application for authentication')
+param clientId string
+
+@description('The issuer URL for the Azure AD')
+param issuerUrl string
+
+@description('The allowed token audiences for the Function App')
+param tokenAudiences array = []
+
+@description('The allowed AAD client application IDs for the Function App')
+param clientApps array = []
+
 @allowed(['SystemAssigned', 'UserAssigned'])
 param identityType string = 'UserAssigned'
 
@@ -80,6 +92,17 @@ module api 'br/public:avm/res/web/site:0.15.1' = {
         name: runtimeName
         version: runtimeVersion
       }
+      identity: {
+        clientId: clientId
+        issuer: issuerUrl
+      }
+      authSettings: {
+        enabled: true
+        defaultProvider: 'AzureActiveDirectory'        
+        tokenValidation: {
+          audiences: tokenAudiences
+        }
+      }
     }
     siteConfig: {
       alwaysOn: false
@@ -88,6 +111,26 @@ module api 'br/public:avm/res/web/site:0.15.1' = {
           'https://portal.azure.com'
         ]
         supportCredentials: false
+      }
+      authsettingsV2: {
+        identityProviders: {
+          azureActiveDirectory: {
+            enabled: true
+            registration: {
+              clientId: clientId
+              openIdIssuer: issuerUrl
+              clientSecretSettingName: 'MICROSOFT_AUTHENTICATION_CLIENT_SECRET'
+            }
+            validation: {
+              allowedAudiences: tokenAudiences
+              defaultAuthorizationPolicy: {
+                jwtClaimChecks: {
+                  allowedClientApplications: clientApps
+                }
+              }
+            }
+          }
+        }
       }
     }
     appSettingsKeyValuePairs: allAppSettings

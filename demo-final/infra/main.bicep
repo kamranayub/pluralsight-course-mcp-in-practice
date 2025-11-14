@@ -46,6 +46,12 @@ param environmentName string
 })
 param location string
 
+@description('The client ID of the Globomantics HRM Azure AD application for authentication')
+param aadHrmClientId string
+
+@description('The client ID of the MCP Server Azure AD application for authentication')
+param aadMcpClientId string
+
 // Optional parameter overrides
 param hrmApiServiceName string = ''
 param hrmApiUserAssignedIdentityName string = ''
@@ -191,10 +197,21 @@ module hrmApi './app/api.bicep' = {
     serviceName: 'hrm-api'
     instanceMemoryMB: 512
     maximumInstanceCount: 100
+    clientId: aadHrmClientId
+    issuerUrl: 'https://login.microsoftonline.com/${tenant().tenantId}/v2.0'
+    clientApps: [
+      aadHrmClientId
+      aadMcpClientId
+    ]
+    tokenAudiences: [
+      'api://${aadHrmClientId}'
+      'api://${aadHrmClientId}/user_impersonation'
+      aadHrmClientId
+    ]
     appSettings: {
-      ASPNETCORE_FORWARDEDHEADERS_ENABLED: 'true'
       AZURE_TENANT_ID: tenant().tenantId
       AZURE_CLIENT_ID: hrmApiUserAssignedIdentity.outputs.clientId
+      MICROSOFT_AUTHENTICATION_CLIENT_SECRET: 'copy-from-hrm-api-entra-app-registration'
     }
   }
 }
