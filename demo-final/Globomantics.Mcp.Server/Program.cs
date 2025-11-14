@@ -1,26 +1,26 @@
-﻿using RestEase;
+﻿using System.Security.Claims;
 using Azure.Core;
 using Azure.Identity;
-using Azure.Storage.Blobs;
-using Globomantics.Mcp.Server.TimeOff;
-using Globomantics.Mcp.Server.Documents;
 using Azure.Search.Documents;
-using ModelContextProtocol.AspNetCore.Authentication;
+using Azure.Storage.Blobs;
+using Globomantics.Mcp.Server.Documents;
+using Globomantics.Mcp.Server.TimeOff;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
-using System.Security.Claims;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.IdentityModel.Tokens;
+using ModelContextProtocol.AspNetCore.Authentication;
+using RestEase;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure port for Azure Functions custom handler
+// Configure for Azure Functions custom handler
 var port = Environment.GetEnvironmentVariable("FUNCTIONS_CUSTOMHANDLER_PORT") ?? "5000";
-var serverUrl = Environment.GetEnvironmentVariable("WEBSITE_HOSTNAME") != null
-    ? $"https://{Environment.GetEnvironmentVariable("WEBSITE_HOSTNAME")}"
-    : $"http://localhost:{port}";
-builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+builder.WebHost.UseUrls($"http://localhost:{port}");
 
-// Configure OAuth
+var serverUrl = builder.Environment.IsProduction() || builder.Environment.IsStaging()
+    ? $"https://{Environment.GetEnvironmentVariable("WEBSITE_HOSTNAME")}"
+    : $"http://{Environment.GetEnvironmentVariable("WEBSITE_HOSTNAME")}";
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowInspector", policy =>
@@ -35,135 +35,151 @@ builder.Services.AddCors(options =>
                 "mcp-protocol-version")
             .AllowCredentials();                  // optional if you later use cookies
     });
-})
-.AddAuthentication(options =>
-{
-    options.DefaultChallengeScheme = McpAuthenticationDefaults.AuthenticationScheme;
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(options =>
-{
-    var tenantId = builder.Configuration["AZURE_TENANT_ID"];
-    var azureIssuerUrl = $"https://sts.windows.net/{tenantId}/";
-    var mcpClientId = builder.Configuration["MCP_SERVER_AAD_CLIENT_ID"];
-
-    options.Authority = azureIssuerUrl;
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true,
-        ValidIssuer = azureIssuerUrl,
-        ValidateAudience = true,
-        ValidAudiences = [mcpClientId, $"api://{mcpClientId}"],
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        NameClaimType = "name",
-        RoleClaimType = "roles"
-    };
-
-    options.Events = new JwtBearerEvents
-    {
-        OnTokenValidated = context =>
-        {
-            var authToken = context.HttpContext.Request.Headers.Authorization.ToString().Replace("Bearer ", "");
-            var name = context.Principal?.Identity?.Name ?? "unknown";
-            var email = context.Principal?.FindFirstValue(ClaimTypes.Email) ?? "unknown";
-            Console.WriteLine($"Token validated for: {name} ({email})");
-            return Task.CompletedTask;
-        },
-        OnAuthenticationFailed = context =>
-        {
-            Console.WriteLine($"Authentication failed: {context.Exception.Message}");
-            return Task.CompletedTask;
-        },
-        OnChallenge = context =>
-        {
-            Console.WriteLine($"Challenging client to authenticate with Entra ID");
-
-            // In production, the app runs behind Functions proxy that may return https://127.0.0.1:{port}
-            context.HandleResponse();
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            context.Response.Headers.WWWAuthenticate =
-                $"Bearer realm=\"mcp\", resource_metadata=\"{serverUrl}/.well-known/oauth-protected-resource\"";
-
-            return Task.CompletedTask;
-        }
-    };
-})
-.AddMcp(options =>
-{
-    var tenantId = builder.Configuration["AZURE_TENANT_ID"];
-    var aadOAuthServerUrl = $"https://login.microsoftonline.com/{tenantId}/v2.0";
-    var mcpClientId = builder.Configuration["MCP_SERVER_AAD_CLIENT_ID"];
-
-    options.ResourceMetadata = new()
-    {
-        Resource = new Uri(serverUrl),
-        ResourceDocumentation = new Uri("https://globomantics.com/mcp"),
-        AuthorizationServers = { new Uri(aadOAuthServerUrl) },
-        ScopesSupported = [$"api://{mcpClientId}/user_impersonation"],
-    };
 });
 
-// Configure Forwarded Headers Middleware to handle proxy headers correctly
-// See: https://docs.duendesoftware.com/identityserver/deployment/#proxy-servers-and-load-balancers
-builder.Services.Configure<ForwardedHeadersOptions>(options =>
-{
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedHost 
-        | ForwardedHeaders.XForwardedProto;
-});
+builder.Services
+    .AddAuthentication(options =>
+    {
+        options.DefaultChallengeScheme = McpAuthenticationDefaults.AuthenticationScheme;
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(options =>
+    {
+        var tenantId = builder.Configuration["AZURE_TENANT_ID"];
+        var azureIssuerUrl = $"https://sts.windows.net/{tenantId}/";
+        var mcpClientId = builder.Configuration["MCP_SERVER_AAD_CLIENT_ID"];
 
-// Add authorization support
+        options.Authority = azureIssuerUrl;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = azureIssuerUrl,
+            ValidateAudience = true,
+            ValidAudiences = [mcpClientId, $"api://{mcpClientId}"],
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            NameClaimType = "name",
+            RoleClaimType = "roles"
+        };
+
+        options.Events = new()
+        {
+            OnTokenValidated = context =>
+            {
+                var name = context.Principal?.Identity?.Name ?? "unknown";
+                var email = context.Principal?.FindFirstValue(ClaimTypes.Email) ?? "unknown";
+                Console.WriteLine($"Token validated for: {name} ({email})");
+                return Task.CompletedTask;
+            },
+            OnAuthenticationFailed = context =>
+            {
+                Console.WriteLine($"Authentication failed: {context.Exception.Message}");
+                return Task.CompletedTask;
+            },
+            OnChallenge = context =>
+            {
+                Console.WriteLine($"Challenging client to authenticate with Entra ID");
+                return Task.CompletedTask;
+            }
+        };
+    })
+    .AddMcp(options =>
+    {
+        var tenantId = builder.Configuration["AZURE_TENANT_ID"];
+        var aadOAuthServerUrl = $"https://login.microsoftonline.com/{tenantId}/v2.0";
+        var mcpClientId = builder.Configuration["MCP_SERVER_AAD_CLIENT_ID"];
+
+        options.ResourceMetadata = new()
+        {
+            Resource = new Uri(serverUrl),
+            ResourceDocumentation = new Uri("https://globomantics.com/mcp"),
+            AuthorizationServers = { new Uri(aadOAuthServerUrl) },
+            ScopesSupported = [$"api://{mcpClientId}/user_impersonation"],
+        };
+    });
+
 builder.Services.AddAuthorization();
 
-// Allow accessing HttpContext in services
-builder.Services.AddHttpContextAccessor();
-
-// Configure MCP server
 builder.Services.AddMcpServer()
     .WithHttpTransport(options =>
     {
-        // In the Advanced MCP course, we will discuss stateful vs stateless MCP servers
+        // Compatibility with Azure Functions hosting model
         options.Stateless = true;
     })
     .WithResourcesFromAssembly()
     .WithToolsFromAssembly()
     .WithPromptsFromAssembly();
 
-// Configure Azure clients and services
-TokenCredential azureCredential;
+// Allow accessing HttpContext in services
+builder.Services.AddHttpContextAccessor();
 
-if (builder.Environment.IsProduction() || builder.Environment.IsStaging())
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
-    azureCredential = new ManagedIdentityCredential(
-        ManagedIdentityId.FromUserAssignedClientId(builder.Configuration["AZURE_CLIENT_ID"]));
+    options.ForwardedHeaders =
+      ForwardedHeaders.XForwardedHost |
+      ForwardedHeaders.XForwardedProto;
+
+    options.ForwardLimit = 1;
+});
+
+ConfigureHrmServices(builder);
+
+var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseCors("AllowInspector");
 }
-else
+
+app.UseForwardedHeaders();
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapMcp().RequireAuthorization();
+
+app.MapGet("/api/healthz", () => "Healthy");
+
+await app.RunAsync();
+
+static void ConfigureHrmServices(IHostApplicationBuilder builder)
 {
-    // local development environment
-    azureCredential = new DefaultAzureCredential();
-}
+    // Configure Azure clients and services
+    TokenCredential azureCredential;
 
-builder.Services.AddSingleton(_ => new BlobServiceClient(
-        new Uri("https://psmcpdemo.blob.core.windows.net/"),
-        azureCredential));
+    if (builder.Environment.IsProduction() || builder.Environment.IsStaging())
+    {
+        azureCredential = new ManagedIdentityCredential(
+            ManagedIdentityId.FromUserAssignedClientId(builder.Configuration["AZURE_CLIENT_ID"]));
+    }
+    else
+    {
+        // local development environment
+        azureCredential = new DefaultAzureCredential();
+    }
 
-builder.Services.AddSingleton(_ => new SearchClient(
-        new Uri("https://psdemo.search.windows.net"),
-        "rag-globomantics-hrm",
-        azureCredential));
+    builder.Services
+        .AddSingleton(_ => new BlobServiceClient(
+            new Uri("https://psmcpdemo.blob.core.windows.net/"),
+            azureCredential))
+        .AddSingleton<IHrmDocumentService, HrmDocumentService>();
 
-builder.Services.AddSingleton(services =>
-{
-    // This is using an OBO (On-Behalf-Of) flow to call the HRM API on behalf of the signed-in user
-    // It does not use passwordless authentication or managed identity, but instead exchanges
-    // the user's access token for a new access token to call the HRM API using the MCP client secret credential
-    var tenantId = builder.Configuration["AZURE_TENANT_ID"];
-    var mcpClientId = builder.Configuration["MCP_SERVER_AAD_CLIENT_ID"];
-    var mcpClientSecret = builder.Configuration["MCP_SERVER_AAD_CLIENT_SECRET"];
-    var hrmEndpoint = builder.Configuration["HRM_API_ENDPOINT"];
-    var hrmAppId = builder.Configuration["HRM_API_AAD_CLIENT_ID"];
+    builder.Services.AddSingleton(_ => new SearchClient(
+            new Uri("https://psdemo.search.windows.net"),
+            "rag-globomantics-hrm",
+            azureCredential));
 
-    return RestClient.For<IHrmAbsenceApi>(hrmEndpoint, async (request, cancellationToken) =>
+    builder.Services.AddSingleton(services =>
+    {
+        // This is using an OBO (On-Behalf-Of) flow to call the HRM API on behalf of the signed-in user
+        // It does not use passwordless authentication or managed identity, but instead exchanges
+        // the user's access token for a new access token to call the HRM API using the MCP client secret credential
+        var tenantId = builder.Configuration["AZURE_TENANT_ID"];
+        var mcpClientId = builder.Configuration["MCP_SERVER_AAD_CLIENT_ID"];
+        var mcpClientSecret = builder.Configuration["MCP_SERVER_AAD_CLIENT_SECRET"];
+        var hrmEndpoint = builder.Configuration["HRM_API_ENDPOINT"];
+        var hrmAppId = builder.Configuration["HRM_API_AAD_CLIENT_ID"];
+
+        return RestClient.For<IHrmAbsenceApi>(hrmEndpoint, async (request, cancellationToken) =>
             {
                 var httpContext = services.GetRequiredService<IHttpContextAccessor>().HttpContext ?? throw new InvalidOperationException("No HttpContext available to acquire user token.");
                 var userAccessToken = httpContext.Request.Headers.Authorization.ToString().Replace("Bearer ", "");
@@ -173,22 +189,5 @@ builder.Services.AddSingleton(services =>
                     new TokenRequestContext([$"api://{hrmAppId}/user_impersonation"]), cancellationToken);
                 request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Token);
             });
-});
-
-builder.Services.AddSingleton<IHrmDocumentService, HrmDocumentService>();
-
-var app = builder.Build();
-
-if (app.Environment.IsDevelopment())
-{
-    app.UseCors("AllowInspector");
+    });
 }
-
-app.UseAuthentication();
-app.UseAuthorization();
-
-app.MapGet("/api/healthz", () => "Healthy");
-
-app.MapMcp().RequireAuthorization();
-
-await app.RunAsync();

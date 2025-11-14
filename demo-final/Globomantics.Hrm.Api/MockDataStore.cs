@@ -48,10 +48,12 @@ public static class MockDataStore
     // Absence types (time off types)
     public static readonly List<AbsenceType> AbsenceTypes = new()
     {
-        new AbsenceType("b35340ce4321102030f8b5a848bc0000", "Flexible Time Off"),
-        new AbsenceType("21bd0afbfbf21011e6ccc4dc170e0000", "Sick Leave"),
-        new AbsenceType("a1234567890abcdef1234567890abcde", "Vacation"),
-        new AbsenceType("b9876543210fedcba0987654321fedcb", "Personal Day")
+        new AbsenceType("a1234567890abcdef1234567890abcde", "VACATION"),
+        new AbsenceType("b35340ce4321102030f8b5a848bc0000", "FLEX_DAY"),
+        new AbsenceType("21bd0afbfbf21011e6ccc4dc170e0000", "SICK_LEAVE"),
+        new AbsenceType("c4567890123456789012345678901234", "MEDICAL_LEAVE"),
+        new AbsenceType("d5678901234567890123456789012345", "LEAVE_OF_ABSENCE"),
+        new AbsenceType("e7890123456789012345678901234567", "X_00SABBATICAL"),
     };
 
     // Benefit plan types
