@@ -1,8 +1,5 @@
 using System.ComponentModel;
 using System.Text.Json;
-using System.Threading.Tasks;
-using Azure.Storage.Blobs;
-using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
@@ -12,11 +9,15 @@ namespace Globomantics.Mcp.Server.Documents;
 [McpServerResourceType]
 public static class DocumentResources
 {
-    public const string ResourceBenefitPlanDocumentsUri = "globomantics://hrm/benefit-documents";
-    public const string ResourceBenefitPlanDocumentUri = "globomantics://hrm/benefit-documents/{documentId}";
+    public const string ResourceBenefitPlanDocumentsUri = "globomantics://hrm/documents";
+    public const string ResourceBenefitPlanDocumentUri = "globomantics://hrm/documents/{documentId}";
 
-    [McpServerResource(UriTemplate = ResourceBenefitPlanDocumentsUri, Name = "Benefit Plan Document List", MimeType = "application/json")]
-    [Description("Retrieves a list of available HRM benefit plan documents")]
+    [McpServerResource(
+        UriTemplate = ResourceBenefitPlanDocumentsUri,
+        Name = "policy-documents.json",
+        Title = "HR Benefit Plan and Policy Documents",
+        MimeType = "application/json")]
+    [Description("Provides a list of policy documents available to employees. Each policy document is a PDF file and may relate to a specific benefit plan that is available to the employee.")]
     public static async Task<IEnumerable<ResourceContents>> DocumentListResource(IHrmDocumentService documentService, CancellationToken cancellationToken)
     {
         var documentInfos = await documentService.GetBenefitPlanDocumentsAsync(cancellationToken);
@@ -29,8 +30,11 @@ public static class DocumentResources
         });
     }
 
-    [McpServerResource(UriTemplate = ResourceBenefitPlanDocumentUri, Name = "Benefit Plan Document")]
-    [Description("Retrieves a specific HRM benefit plan document by its resource ID")]
+    [McpServerResource(
+        UriTemplate = ResourceBenefitPlanDocumentUri,
+        Name = "HR Benefit Plan and Policy Document by ID",
+        MimeType = "application/pdf")]
+    [Description("Retrieves a specific HRM benefit plan document by its document ID (e.g. Globomantics-Plan.pdf)")]
     public static async Task<ResourceContents> DocumentResourceById(string documentId, IHrmDocumentService documentService, CancellationToken cancellationToken)
     {
         var downloadResult = await documentService.GetBenefitPlanDocumentContentAsync(documentId, cancellationToken);
@@ -46,34 +50,5 @@ public static class DocumentResources
             MimeType = "application/pdf",
             Uri = ResourceBenefitPlanDocumentUri.Replace("{documentId}", documentId),
         };
-    }
-
-
-    public async static ValueTask<CompleteResult> GetCompletionsForDocumentRequest(RequestContext<CompleteRequestParams> requestContext, CancellationToken cancellationToken)
-    {
-        var result = new CompleteResult()
-        {
-            Completion = new Completion()
-        };
-
-        if (requestContext.Params?.Argument.Name == "documentId")
-        {
-            var documentSearchValue = requestContext.Params.Argument.Value;
-            var blobServiceClient = requestContext.Services?.GetService<BlobServiceClient>() ?? throw new InvalidOperationException("No Azure Blob Service Client was found");
-            var containerClient = blobServiceClient.GetBlobContainerClient("globomanticshrm");
-
-            var blobList = new List<string>();
-            await foreach (var blobItem in containerClient.GetBlobsAsync(cancellationToken: cancellationToken))
-            {
-                if (blobItem.Name.Contains(documentSearchValue, StringComparison.OrdinalIgnoreCase))
-                {
-                    blobList.Add(blobItem.Name);
-                }
-            }
-
-            result.Completion.Values = blobList;
-        }
-
-        return result;
     }
 }

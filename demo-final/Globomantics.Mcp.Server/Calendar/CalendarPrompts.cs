@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using Globomantics.Mcp.Server.TimeOff;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
@@ -5,17 +6,23 @@ using ModelContextProtocol.Server;
 namespace Globomantics.Mcp.Server.Calendar;
 
 [McpServerPromptType]
-public static class CalendarPrompts
+public class CalendarPrompts(IHrmAbsenceApi hrmAbsenceApi)
 {
-    [McpServerPrompt(Title = "Next Scheduled Work Holiday")]
-    public static async Task<IEnumerable<PromptMessage>> GetNextScheduledHoliday(IHrmAbsenceApi hrmAbsenceApi, CancellationToken cancellationToken)
+    private readonly IHrmAbsenceApi hrmAbsenceApi = hrmAbsenceApi;
+
+    [McpServerPrompt(Title = "Next Scheduled Work Holiday", Name = "Next Scheduled Work Holiday")]
+    [Description("Finds the next scheduled work holiday for where you work.")]
+    public async Task<IEnumerable<PromptMessage>> GetNextScheduledHoliday(
+        CancellationToken cancellationToken,
+
+        [Description("The work year to use for the calendar. If not provided, the current year is used.")]
+        string? workYear = null)
     {
+        var employeeIdResponse = await hrmAbsenceApi.GetAuthenticatedUserIdAsync(cancellationToken);
+        var employeeDetails = await hrmAbsenceApi.GetWorkerByIdAsync(employeeIdResponse.EmployeeId, cancellationToken);
+        var employeeLocation = employeeDetails.HQLocation == "IN" ? WorkLocation.India : WorkLocation.UnitedStates;
 
-        var employeeIdResult = await hrmAbsenceApi.GetAuthenticatedUserIdAsync(cancellationToken);
-        var employeeDetails = await hrmAbsenceApi.GetWorkerByIdAsync(employeeIdResult.EmployeeId, cancellationToken);
-        var employeeLocation = employeeDetails.HQLocation == "US" ? WorkLocation.UnitedStates : WorkLocation.India;
-
-        var year = DateTime.Now.Year;
+        var year = string.IsNullOrWhiteSpace(workYear) ? DateTime.Now.Year : int.Parse(workYear);
 
         return [
             new PromptMessage()
@@ -46,7 +53,7 @@ public static class CalendarPrompts
                 Role = Role.User,
                 Content = new TextContentBlock()
                 {
-                    Text = "When is the next scheduled Globomantics work holiday?"
+                    Text = "When is my next scheduled work holiday?"
                 }
             }
         ];

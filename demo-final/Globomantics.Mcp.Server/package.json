@@ -4,10 +4,9 @@
   "private": true,
   "description": "MCP server for Globomantics",
   "scripts": {
-    "start": "dotnet run",
+    "start": "func start",
     "dev": "npx @modelcontextprotocol/inspector --config mcp.json --server globomantics-hrm",
     "prod": "npx @modelcontextprotocol/inspector --config mcp.json --server globomantics-hrm-prod",
-    "func": "npx @modelcontextprotocol/inspector --config mcp.json --server globomantics-hrm-func",
     "postinstall": "patch-package"
   },
   "keywords": [],

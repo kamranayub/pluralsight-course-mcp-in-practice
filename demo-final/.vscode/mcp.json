@@ -1,21 +1,12 @@
 {
     "servers": {
-        "azure-mcp-server": {
-            "command": "npx",
-            "args": [
-                "-y",
-                "@azure/mcp@latest",
-                "server",
-                "start"
-            ]
-        },
         "globomantics-mcp-server-local": {            
             "type": "http",
             "url": "http://localhost:5000/"
         },
         "globomantics-mcp-server-remote": {
             "type": "http",
-            "url": "https://func-globomantics-mcp-7emfn6vonnqs4.azurewebsites.net"
+            "url": "https://endpoint.azurewebsites.net"
         }
     }
 }
