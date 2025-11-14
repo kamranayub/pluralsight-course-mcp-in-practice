@@ -46,6 +46,9 @@ param environmentName string
 })
 param location string
 
+@description('Whether to deploy a new AI services. If false, you must provide an existing AI Search Service endpoint to the MCP server.')
+param deployAiServices bool
+
 @description('The client ID of the Globomantics HRM Azure AD application for authentication')
 param aadHrmClientId string
 
@@ -116,7 +119,7 @@ module storage './app/storage.bicep' = {
   scope: rg
   params: {
     functionStorageName: !empty(functionStorageAccountName) ? functionStorageAccountName : '${abbrs.storageStorageAccounts}${resourceToken}'
-    documentStorageName: !empty(documentStorageAccountName) ? documentStorageAccountName : 'psmcpdemo'
+    documentStorageName: !empty(documentStorageAccountName) ? documentStorageAccountName : '${abbrs.storageStorageAccounts}hrmdocs${resourceToken}'
     location: location
     tags: tags
     documentContainerName: 'globomanticshrm'
@@ -125,7 +128,7 @@ module storage './app/storage.bicep' = {
 }
 
 // Azure AI Search Service
-module search './app/search.bicep' = {
+module search './app/search.bicep' = if(deployAiServices) {
   name: 'search'
   scope: rg
   params: {
@@ -139,7 +142,7 @@ module search './app/search.bicep' = {
 }
 
 // Azure OpenAI / AI Services
-module aiServices './app/aiservices.bicep' = {
+module aiServices './app/aiservices.bicep' = if (deployAiServices) {
   name: 'aiServices'
   scope: rg
   params: {
@@ -149,8 +152,6 @@ module aiServices './app/aiservices.bicep' = {
     sku: 'S0'
     kind: 'AIServices'
     customSubDomainName: !empty(aiServicesAccountName) ? aiServicesAccountName : '${abbrs.cognitiveServicesAccounts}${resourceToken}'
-    deployEmbeddingModel: true
-    embeddingModelCapacity: 120
   }
 }
 
@@ -221,10 +222,11 @@ module rbac './app/rbac.bicep' = {
   name: 'rbacAssignments'
   scope: rg
   params: {
+    enableAiServices: deployAiServices
     functionStorageAccountName: storage.outputs.functionStorageName
     documentStorageAccountName: storage.outputs.documentStorageName
-    searchServiceName: search.outputs.name
-    aiServicesAccountName: aiServices.outputs.name
+    searchServiceName: search.?outputs.name ?? ''
+    aiServicesAccountName: aiServices.?outputs.name ?? ''
     appInsightsName: monitoring.outputs.name
     managedIdentityPrincipalId: hrmApiUserAssignedIdentity.outputs.principalId
     userIdentityPrincipalId: principalId
@@ -240,5 +242,5 @@ output AZURE_RESOURCE_GROUP string = rg.name
 output SERVICE_HRM_API_NAME string = hrmApi.outputs.SERVICE_API_NAME
 output SERVICE_HRM_API_URI string = hrmApi.outputs.SERVICE_API_URI
 output AZURE_FUNCTION_NAME string = hrmApi.outputs.SERVICE_API_NAME
-output AZURE_SEARCH_ENDPOINT string = search.outputs.endpoint
-output AZURE_OPENAI_ENDPOINT string = aiServices.outputs.endpoint
+output AZURE_SEARCH_ENDPOINT string = search.?outputs.endpoint ?? ''
+output AZURE_OPENAI_ENDPOINT string = aiServices.?outputs.endpoint ?? ''

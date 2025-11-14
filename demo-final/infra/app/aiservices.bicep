@@ -21,12 +21,6 @@ param publicNetworkAccess string = 'Enabled'
 @description('Custom subdomain name for the account')
 param customSubDomainName string = name
 
-@description('Deploy text-embedding-ada-002 model')
-param deployEmbeddingModel bool = true
-
-@description('Embedding model capacity')
-param embeddingModelCapacity int = 120
-
 resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   name: name
   location: location
@@ -47,24 +41,6 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
     }
     publicNetworkAccess: publicNetworkAccess
     apiProperties: {}
-  }
-}
-
-// Deploy text-embedding-ada-002 model if requested
-resource embeddingDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = if (deployEmbeddingModel) {
-  parent: aiServices
-  name: 'text-embedding-ada-002'
-  sku: {
-    name: 'GlobalStandard'
-    capacity: embeddingModelCapacity
-  }
-  properties: {
-    model: {
-      format: 'OpenAI'
-      name: 'text-embedding-ada-002'
-      version: '2'
-    }
-    versionUpgradeOption: 'NoAutoUpgrade'
   }
 }
 

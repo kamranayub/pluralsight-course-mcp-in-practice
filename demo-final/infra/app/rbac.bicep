@@ -22,6 +22,8 @@ param userIdentityPrincipalId string = ''
 @description('Flag to enable user identity role assignments')
 param allowUserIdentityPrincipal bool = false
 
+param enableAiServices bool
+
 // Define Role Definition IDs
 var storageRoleDefinitionId = 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b' // Storage Blob Data Owner
 var searchIndexDataContributorRoleId = '8ebe5a00-799e-43f5-93ac-243d3dce84a7' // Search Index Data Contributor
@@ -38,11 +40,11 @@ resource documentStorageAccount 'Microsoft.Storage/storageAccounts@2022-09-01' e
   name: documentStorageAccountName
 }
 
-resource searchService 'Microsoft.Search/searchServices@2024-06-01-preview' existing = {
+resource searchService 'Microsoft.Search/searchServices@2024-06-01-preview' existing = if (enableAiServices) {
   name: searchServiceName
 }
 
-resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = {
+resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = if (enableAiServices) {
   name: aiServicesAccountName
 }
 
@@ -75,7 +77,7 @@ resource documentStorageRoleAssignment 'Microsoft.Authorization/roleAssignments@
 }
 
 // Search Service - Search Index Data Contributor
-resource searchIndexRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource searchIndexRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (enableAiServices) {
   name: guid(searchService.id, managedIdentityPrincipalId, searchIndexDataContributorRoleId)
   scope: searchService
   properties: {
@@ -86,7 +88,7 @@ resource searchIndexRoleAssignment 'Microsoft.Authorization/roleAssignments@2022
 }
 
 // Search Service - Search Service Contributor
-resource searchServiceRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource searchServiceRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (enableAiServices) {
   name: guid(searchService.id, managedIdentityPrincipalId, searchServiceContributorRoleId)
   scope: searchService
   properties: {
@@ -97,7 +99,7 @@ resource searchServiceRoleAssignment 'Microsoft.Authorization/roleAssignments@20
 }
 
 // AI Services - Cognitive Services User
-resource aiServicesRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource aiServicesRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (enableAiServices) {
   name: guid(aiServices.id, managedIdentityPrincipalId, cognitiveServicesUserRoleId)
   scope: aiServices
   properties: {
@@ -143,7 +145,7 @@ resource documentStorageRoleAssignment_User 'Microsoft.Authorization/roleAssignm
 }
 
 // Search Service - User Identity (Index Data Contributor)
-resource searchIndexRoleAssignment_User 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (allowUserIdentityPrincipal && !empty(userIdentityPrincipalId)) {
+resource searchIndexRoleAssignment_User 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (enableAiServices && allowUserIdentityPrincipal && !empty(userIdentityPrincipalId)) {
   name: guid(searchService.id, userIdentityPrincipalId, searchIndexDataContributorRoleId)
   scope: searchService
   properties: {
@@ -154,7 +156,7 @@ resource searchIndexRoleAssignment_User 'Microsoft.Authorization/roleAssignments
 }
 
 // AI Services - User Identity
-resource aiServicesRoleAssignment_User 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (allowUserIdentityPrincipal && !empty(userIdentityPrincipalId)) {
+resource aiServicesRoleAssignment_User 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (enableAiServices && allowUserIdentityPrincipal && !empty(userIdentityPrincipalId)) {
   name: guid(aiServices.id, userIdentityPrincipalId, cognitiveServicesUserRoleId)
   scope: aiServices
   properties: {
