@@ -1,6 +1,6 @@
 # Globomantics MCP Server
 
-## Secrets
+## Secrets & Environment Variables
 
 You will need to configure secrets to run this MCP server and have the required Azure resources set-up:
 
@@ -11,6 +11,12 @@ dotnet user-secrets init
 dotnet user-secrets set "AZURE_TENANT_ID" "<tenant_id>"
 # Azure Functions App Endpoint for HRM API
 dotnet user-secrets set "HRM_API_ENDPOINT" "<endpoint>"
+# Azure Storage Blob Service for the `sthrmdocs` Document Storage Account
+dotnet user-secrets set "HRM_BLOB_SERVICE_ENDPOINT" "<endpoint>"
+# Azure AI Search Service Endpoint
+dotnet user-secrets set "HRM_SEARCH_SERVICE_ENDPOINT" "<endpoint>"
+# Azure AI Search Service Index Name
+dotnet user-secrets set "HRM_SEARCH_SERVICE_INDEX_NAME" "index_name"
 # Azure Entra application ID for the HRM API (EasyAuth)
 dotnet user-secrets set "HRM_API_AAD_CLIENT_ID" "<client_id>"
 # Azure Entra application ID for the MCP Server (S2S auth)
@@ -23,6 +29,9 @@ dotnet user-secrets set "MCP_SERVER_AAD_CLIENT_SECRET" "<client_secret>"
 > The .NET user secrets store is **not secure** and stores values in plain-text in your user profile folder.
 > For production apps, you would want to [use something like Azure KeyVault](https://learn.microsoft.com/en-us/aspnet/core/security/key-vault-configuration?view=aspnetcore-9.0)
 
+> [!IMPORTANT]
+> You will need the same environment variables added on the Azure Functions app. `azd up` will not create them for you.
+
 ## Commands
 
 ### `npm start`
@@ -32,6 +41,14 @@ Starts the .NET MCP server using `dotnet run` command.
 ### `npm run dev`
 
 Starts the MCP inspector using the default `mcp.json` config file.
+
+### `azd up`
+
+Provision and stand up the MCP Function App infrastructure. **Remember to set environment variables after provisioning.**
+
+### `azd deploy`
+
+Deploys the Function App service. Use after running `azd up` if you don't have any infra changes.
 
 ## Azure Configuration
 

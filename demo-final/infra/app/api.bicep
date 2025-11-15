@@ -50,6 +50,7 @@ var baseAppSettings = {
   // Application Insights settings
   APPLICATIONINSIGHTS_AUTHENTICATION_STRING: applicationInsightsIdentity
   APPLICATIONINSIGHTS_CONNECTION_STRING: applicationInsights.properties.ConnectionString
+  WEBSITE_AUTH_AAD_ALLOWED_TENANTS: tenant().tenantId
 }
 
 // Merge all app settings
@@ -92,17 +93,6 @@ module api 'br/public:avm/res/web/site:0.15.1' = {
         name: runtimeName
         version: runtimeVersion
       }
-      identity: {
-        clientId: clientId
-        issuer: issuerUrl
-      }
-      authSettings: {
-        enabled: true
-        defaultProvider: 'AzureActiveDirectory'        
-        tokenValidation: {
-          audiences: tokenAudiences
-        }
-      }
     }
     siteConfig: {
       alwaysOn: false
@@ -112,28 +102,39 @@ module api 'br/public:avm/res/web/site:0.15.1' = {
         ]
         supportCredentials: false
       }
-      authsettingsV2: {
-        identityProviders: {
-          azureActiveDirectory: {
-            enabled: true
-            registration: {
-              clientId: clientId
-              openIdIssuer: issuerUrl
-              clientSecretSettingName: 'MICROSOFT_AUTHENTICATION_CLIENT_SECRET'
-            }
-            validation: {
-              allowedAudiences: tokenAudiences
-              defaultAuthorizationPolicy: {
-                jwtClaimChecks: {
-                  allowedClientApplications: clientApps
-                }
-              }
-            }
+    }
+    appSettingsKeyValuePairs: allAppSettings
+    authSettingV2Configuration: {        
+      globalValidation: {
+        requireAuthentication: true
+        redirectToProvider: 'azureActiveDirectory'
+        unauthenticatedClientAction: 'Return302'
+      }
+      identityProviders: {
+        azureActiveDirectory: {
+          enabled: true
+          registration: {
+            clientId: clientId
+            openIdIssuer: issuerUrl
+            clientSecretSettingName: 'MICROSOFT_PROVIDER_AUTHENTICATION_SECRET'
+          }
+          validation: {
+            allowedAudiences: tokenAudiences     
+            defaultAuthorizationPolicy: {
+              allowedApplications: clientApps
+            }       
           }
         }
       }
+      login: {
+        tokenStore: {
+          azureBlobStorage: {}
+          enabled: true
+          fileSystem: {}
+          tokenRefreshExtensionHours: 72
+        }
+      }
     }
-    appSettingsKeyValuePairs: allAppSettings
   }
 }
 

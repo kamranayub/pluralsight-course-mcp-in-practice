@@ -212,7 +212,7 @@ module hrmApi './app/api.bicep' = {
     appSettings: {
       AZURE_TENANT_ID: tenant().tenantId
       AZURE_CLIENT_ID: hrmApiUserAssignedIdentity.outputs.clientId
-      MICROSOFT_AUTHENTICATION_CLIENT_SECRET: 'copy-from-hrm-api-entra-app-registration'
+      MICROSOFT_PROVIDER_AUTHENTICATION_SECRET: 'copy-from-hrm-api-entra-app-registration'
     }
   }
 }

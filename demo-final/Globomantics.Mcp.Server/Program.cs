@@ -159,13 +159,13 @@ static void ConfigureHrmServices(IHostApplicationBuilder builder)
 
     builder.Services
         .AddSingleton(_ => new BlobServiceClient(
-            new Uri("https://psmcpdemo.blob.core.windows.net/"),
+            new Uri(builder.Configuration["HRM_BLOB_SERVICE_ENDPOINT"]!),
             azureCredential))
         .AddSingleton<IHrmDocumentService, HrmDocumentService>();
 
     builder.Services.AddSingleton(_ => new SearchClient(
-            new Uri("https://psdemo.search.windows.net"),
-            "rag-globomantics-hrm",
+            new Uri(builder.Configuration["HRM_SEARCH_SERVICE_ENDPOINT"]!),
+            builder.Configuration["HRM_SEARCH_SERVICE_INDEX_NAME"]!,
             azureCredential));
 
     builder.Services.AddSingleton(services =>
