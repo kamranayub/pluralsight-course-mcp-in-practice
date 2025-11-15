@@ -19,7 +19,7 @@ There are **two** Azure Bicep projects: `azure.yaml` and `Globomantics.Mcp.Serve
 
 The `tenantId` or `AZURE_TENANT_ID` references are to your Entra tenant directory (aka Azure AD).
 
-Follow the [GLobomantics.Mcp.Server/README.md] file for Entra configuration steps.
+Follow the [Globomantics.Mcp.Server/README.md](Globomantics.Mcp.Server/README.md) file for Entra configuration steps.
 
 ### Provision HRM API
 
