@@ -69,35 +69,9 @@ When using the `stdio` transport, authentication options are limited. Enterprise
 
 For `stdio`, you can instead use **app-only authentication**, where the MCP server authenticates to an external API with its own client ID and secret. In this model, the server connects as *itself*, not as an individual user. This means endpoints that depend on a signed-in user won’t work until the demo is upgraded to the Streamable HTTP transport later in the course.
 
-See [Native client app registration](https://learn.microsoft.com/en-us/azure/app-service/configure-authentication-provider-aad?tabs=workforce-configuration#native-client-application) for detailed setup steps.
-
-> [!IMPORTANT]
-> The official documentation omits a key step:
-> You must add your MCP app registration’s **Application (client) ID** to the **Allowed client applications** list in the Azure App Service Authentication settings.
-> If this list is populated, Easy Auth blocks all callers that aren’t explicitly listed—including your MCP app—resulting in a 403 Forbidden response.
-
 #### Streamable HTTP transport
 
 In the final demo, the MCP server uses a **native OAuth2 OBO flow** through Azure App Service Easy Auth and Entra ID. The server requests tokens **on behalf of the signed-in user** (the MCP client), effectively forwarding their credentials to the downstream HRM API in a standard native-app authorization flow.
-
-To configure this, create an **App Registration** for the MCP server and grant it **delegated API permissions** to the HRM API (`user_impersonation` scope).
-
-> [!TIP]
-> Make sure you own both the MCP server and HRM API app registrations.
-> Otherwise, the HRM API’s `user_impersonation` delegated permission won’t appear when you edit the MCP app registration.
-
-- Ensure `http://localhost:6274/oauth/callback/debug` and `http://localhost:6274/oauth/callback` are added as Redirect URIs
-- Ensure an API Permission scope is created for `api://{client_id}/user_impersonation` (which will allow delegated access)
-
-> [!IMPORTANT]
-> The demo uses a simplified (and less secure) OAuth flow that is compatible with Azure Entra ID and does not use Azure API Management. This is to keep the demos simpler and to focus on the MCP-specific implementation of OAuth.
-
-> For a real production MCP server with Azure, the best practice would be to ensure **no Entra ID tokens** are sent back to the MCP client and to use passwordless flows using managed identities. For an advanced flow that demonstrates this, see [Den Delimarsky's sample and write-up](https://github.com/localden/remote-auth-mcp-apim-py) using APIM.
->
-> In order to support the simpler flow, I had to [patch](patches/) the `@modelcontextprotocol/inspector` and `@modelcontextprotocol/inspector-client` packages, based on some work by Jeremy Smith (see [commits](https://github.com/modelcontextprotocol/inspector/compare/main...2underscores:inspector:azure-no-code-challenge-in-metadata) and [discussion](https://github.com/modelcontextprotocol/inspector/issues/685)).
->
-> In addition, the OBO flow uses an client secret flow instead of passwordless auth because it's simpler. This is less secure
-> since the `MCP_SERVER_AAD_CLIENT_SECRET` has to be provided in plain-text as an environment variable or user secret.
 
 ## Examples
 

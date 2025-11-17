@@ -17,9 +17,53 @@ There are **two** Azure Bicep projects: `azure.yaml` and `Globomantics.Mcp.Serve
 
 ### Prerequisite: Entra Tenant Configuration
 
-The `tenantId` or `AZURE_TENANT_ID` references are to your Entra tenant directory (aka Azure AD).
+> [!TIP]
+> You can reference [my Entra app manifest files](infra/entra/) (`infra/entra/`) to help verify your configuration.
 
-Follow the [Globomantics.Mcp.Server/README.md](Globomantics.Mcp.Server/README.md) file for Entra configuration steps.
+> [!NOTE]
+> The `tenantId` or `AZURE_TENANT_ID` references are to your Entra tenant directory (aka Azure AD).
+
+1. Create an **App Registration** for the HRM API
+  - Take note of the **App (Client) ID**
+  - Add a `user_impersonation` API permission for **Delegated** auth
+  - This is a simple setup -- the Azure Easy Auth will be configured during `azd up`
+1. Create an **App Registration** for the MCP server
+  - Add a Mobile/Desktop platform and ensure `ms-appx-web://microsoft.aad.brokerplugin/04f0c124-f2bc-4f59-8241-bf6df9866bbd` is added as a  Redirect URI
+    - This is for `Azure.Identity` Broker plug-in
+  - Add a SPA platform and ensure `http://localhost:6274/oauth/callback/debug` and `http://localhost:6274/oauth/callback` are added as Redirect URIs
+    - This is for MCP Inspector support
+  - Configure app delegation / impersonation configuration detailed below
+
+#### Configuring App Delegation / Impersonation
+
+
+Configure the MCP client app registration with [Native client app registration](https://learn.microsoft.com/en-us/azure/app-service/configure-authentication-provider-aad?tabs=workforce-configuration#native-client-application).
+
+> [!IMPORTANT]
+> The official documentation omits a key step:
+> You must add your MCP app registration’s **Application (client) ID** to the **Allowed client applications** list in the Azure App Service Authentication settings.
+> If this list is populated, Easy Auth blocks all callers that aren’t explicitly listed—including your MCP app—resulting in a 403 Forbidden response.
+>
+> **This is configured for you during `azd up`.**
+
+Grant the MCP Server client app **delegated API permissions** to the HRM API (`user_impersonation` scope).
+
+- Add an **API Permission scope** for `api://{client_id}/user_impersonation` (which will allow delegated access)
+
+> [!TIP]
+> Make sure you own both the MCP server and HRM API app registrations.
+> Otherwise, the HRM API’s `user_impersonation` delegated permission won’t appear when you edit the MCP app registration.
+
+> [!IMPORTANT]
+> The demo uses a simplified (and less secure) OAuth flow that is compatible with Azure Entra ID and does not use Azure API Management. This is to keep the demos simpler and to focus on the MCP-specific implementation of OAuth.
+
+> For a real production MCP server with Azure, the best practice would be to ensure **no Entra ID tokens** are sent back to the MCP client and to use passwordless flows using managed identities. For an advanced flow that demonstrates this, see [Den Delimarsky's sample and write-up](https://github.com/localden/remote-auth-mcp-apim-py) using APIM.
+>
+> In order to support the simpler flow, I had to [patch](patches/) the `@modelcontextprotocol/inspector` and `@modelcontextprotocol/inspector-client` packages, based on some work by Jeremy Smith (see [commits](https://github.com/modelcontextprotocol/inspector/compare/main...2underscores:inspector:azure-no-code-challenge-in-metadata) and [discussion](https://github.com/modelcontextprotocol/inspector/issues/685)).
+>
+> In addition, the OBO flow uses an client secret flow instead of passwordless auth because it's simpler. This is less secure
+> since the `MCP_SERVER_AAD_CLIENT_SECRET` has to be provided in plain-text as an environment variable or user secret.
+
 
 ### Provision HRM API
 
