@@ -24,15 +24,15 @@ There are **two** Azure Bicep projects: `azure.yaml` and `Globomantics.Mcp.Serve
 > The `tenantId` or `AZURE_TENANT_ID` references are to your Entra tenant directory (aka Azure AD).
 
 1. Create an **App Registration** for the HRM API
-  - Take note of the **App (Client) ID**
-  - Add a `user_impersonation` API permission for **Delegated** auth
-  - This is a simple setup -- the Azure Easy Auth will be configured during `azd up`
+    - Take note of the **App (Client) ID**
+    - Add a `user_impersonation` API permission for **Delegated** auth
+    - This is a simple setup -- the Azure Easy Auth will be configured during `azd up`
 1. Create an **App Registration** for the MCP server
-  - Add a Mobile/Desktop platform and ensure `ms-appx-web://microsoft.aad.brokerplugin/04f0c124-f2bc-4f59-8241-bf6df9866bbd` is added as a  Redirect URI
-    - This is for `Azure.Identity` Broker plug-in
-  - Add a SPA platform and ensure `http://localhost:6274/oauth/callback/debug` and `http://localhost:6274/oauth/callback` are added as Redirect URIs
-    - This is for MCP Inspector support
-  - Configure app delegation / impersonation configuration detailed below
+    - Add a Mobile/Desktop platform and ensure `ms-appx-web://microsoft.aad.brokerplugin/04f0c124-f2bc-4f59-8241-bf6df9866bbd` is added as a  Redirect URI
+      - This is for `Azure.Identity` Broker plug-in
+    - Add a SPA platform and ensure `http://localhost:6274/oauth/callback/debug` and `http://localhost:6274/oauth/callback` are added as Redirect URIs
+      - This is for MCP Inspector support
+    - Configure app delegation / impersonation configuration detailed below
 
 #### Configuring App Delegation / Impersonation
 
