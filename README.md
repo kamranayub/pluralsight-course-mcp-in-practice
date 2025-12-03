@@ -42,7 +42,7 @@ Please report course issues using the [Issues](issues) page or the Pluralsight d
 
 ### Courses
 
-- [Model Context Protocol: Advanced Featured](#) (**In Development**)
+- [Model Context Protocol: Advanced Features](#) (**In Development**)
 - [Using the Model Context Protocol SDK in C#](https://www.pluralsight.com/courses/using-c-model-context-protocol-sdk)
 
 ### Links
