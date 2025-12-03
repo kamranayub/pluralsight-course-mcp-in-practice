@@ -1,10 +1,12 @@
 # Model Context Protocol in Practice Pluralsight Course
 
-This repository is for the Pluralsight course **[Model Context Protocol in Practice]($COURSE_LINK$)**. The license is Apache 2.0.
+This repository is for the Pluralsight course **[Model Context Protocol in Practice](https://www.pluralsight.com/courses/model-context-protocol-practice)**. The license is Apache 2.0.
 
-[![Course overview screenshot]($COURSE_HERO_IMAGE$)]($COURSE_LINK$)
 
-> $COURSE_DESC
+
+[<img width="867" height="443" alt="image" src="https://github.com/user-attachments/assets/cb5e5e75-eaa9-44a6-a00a-74f0a4dd8345" />](https://www.pluralsight.com/courses/model-context-protocol-practice)
+
+> Model Context Protocol (MCP) opens the door for connecting AI models to real systems. This course will teach you how to implement MCP servers and clients, integrate tools and resources, and secure your MCP applications.
 
 ## Table of Contents
 
@@ -33,15 +35,15 @@ Please report course issues using the [Issues](issues) page or the Pluralsight d
 
 ## Updates
 
-- **November 2025**
+- **December 2025**
   - Initial release 🎉
 
 ## Additional Resources
 
 ### Courses
 
-- [Model Context Protocol: Advanced Featured](tbd) (**In Development**)
-- [Using the Model Context Protocol SDK in C#](tbd) (**In Development**)
+- [Model Context Protocol: Advanced Featured](#) (**In Development**)
+- [Using the Model Context Protocol SDK in C#](https://www.pluralsight.com/courses/using-c-model-context-protocol-sdk)
 
 ### Links
 
