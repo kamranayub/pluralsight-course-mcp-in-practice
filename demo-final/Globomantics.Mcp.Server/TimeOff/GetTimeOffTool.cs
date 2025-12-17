@@ -31,7 +31,7 @@ public class GetTimeOffTool
                 {
                     Uri = CalendarResources.ResourceWorkCalendarUri,
                     MimeType = "application/json",
-                    Text = CalendarResources.WorkCalendarResource(),
+                    Text = CalendarResources.WorkCalendarsResource(),
                 }
             },
             new EmbeddedResourceBlock
