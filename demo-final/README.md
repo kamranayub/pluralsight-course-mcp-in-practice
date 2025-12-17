@@ -27,6 +27,7 @@ There are **two** Azure Bicep projects: `azure.yaml` and `Globomantics.Mcp.Serve
     - Take note of the **App (Client) ID**
     - Add a `user_impersonation` API permission for **Delegated** auth
     - This is a simple setup -- the Azure Easy Auth will be configured during `azd up`
+    - A **Web - Redirect URI** set to your Azure Functions App endpoint e.g. `https://endpoint.azurewebsites.net/.auth/login/aad/callback`
 1. Create an **App Registration** for the MCP server
     - Add a Mobile/Desktop platform and ensure `ms-appx-web://microsoft.aad.brokerplugin/04f0c124-f2bc-4f59-8241-bf6df9866bbd` is added as a  Redirect URI
       - This is for `Azure.Identity` Broker plug-in
@@ -90,11 +91,26 @@ Grant the MCP Server client app **delegated API permissions** to the HRM API (`u
     - Specify `aadMcpClientId` for the MCP server
 1. Once provisioned, you **must** configure the Entra ID (AAD) client secret in the Azure Functions App
     - Env Variable: `MICROSOFT_PROVIDER_AUTHENTICATION_SECRET`
+1. Once provisioned, you **must** configure the Entra ID (AAD) to add a Redirect URI:
+    - **Web**: `https://<endpoint>.azurewebsites.net/.auth/login/aad/callback`
 
 > [!IMPORTANT]
 > If `deployAiServices` is true, the deployment will provision a free-tier AI Search service, but **not a model deployment** or an AI Search Indexer!
 > 
 > You will still need to set these up manually as they cannot be provisioned through Bicep.
+
+#### Test the API and Login Flow
+
+Open the deployed Azure Functions endpoint and Swagger UI in your browser:
+
+https://<endpoint>.azurewebsites.net/api/swagger/ui#/default/getAuthenticatedUserIdRaaS
+
+You should be redirected to the Microsoft login flow and once you grant consent, redirected back to the app.
+
+Try to execute the "Get Authenticated User ID" endpoint and make sure it returns a 200 success status.
+
+> [!TIP]
+> If you are already logged in to Azure, you may need to restart the Function App for the authentication changes to take effect. You can also **Disable** the authentication and then **re-enable** it to force it. You can test by opening a "private" Windows/tab in your browser and trying to visit the endpoint which should redirect you to the Microsoft Login and consent flow.
 
 #### Upload PDF Documents
 
