@@ -13,7 +13,7 @@ public class AskAboutPolicyTool(SearchClient searchClient)
 {
     private readonly SearchClient searchClient = searchClient;
 
-    [McpServerTool(Title = "Ask About Policy"), Description(
+    [McpServerTool(Title = "Ask About Policy", OpenWorld = true), Description(
         """
         Help Globomantics employees answer questions about benefits policies such as medical, dental, vision, and retirement plans.
         The Plan Time Off tool is better for answering questions about sabbaticals, leave, and vacation.

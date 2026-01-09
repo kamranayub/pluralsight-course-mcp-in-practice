@@ -2,16 +2,18 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Abstractions;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Configurations;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.OpenApi.Models;
 using System.Text.Json;
 
 var builder = FunctionsApplication.CreateBuilder(args);
+var enableAuth = builder.Configuration.GetValue<bool>("API_ENABLE_AUTH");
 
 builder.ConfigureFunctionsWebApplication();
 
-if (DefaultOpenApiConfigurationOptions.IsFunctionsRuntimeEnvironmentDevelopment()) {
+if (enableAuth && DefaultOpenApiConfigurationOptions.IsFunctionsRuntimeEnvironmentDevelopment()) {
     builder.UseMiddleware<DevelopmentAuthMiddleware>();
 }
 

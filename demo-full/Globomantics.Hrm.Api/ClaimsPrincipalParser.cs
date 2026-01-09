@@ -54,7 +54,9 @@ public static class ClaimsPrincipalParser
         principal ??= new ClientPrincipal();
         
         var identity = new ClaimsIdentity(principal.IdentityProvider, principal.NameClaimType, principal.RoleClaimType);
-        identity.AddClaims(principal.Claims.Select(c => new Claim(c.Type, c.Value)));
+        if (principal.Claims != null) {
+            identity.AddClaims(principal.Claims.Select(c => new Claim(c.Type, c.Value)));
+        }
         
         return new ClaimsPrincipal(identity);
     }

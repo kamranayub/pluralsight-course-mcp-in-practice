@@ -28,18 +28,22 @@ var builder = DistributedApplication.CreateBuilder(args);
 var hasAzureSubscriptionSet = builder.Configuration.GetValue<string>("Azure:SubscriptionId") is not null;
 
 var azureTenantId = builder.AddParameter("azureTenantId", secret: true)
-    .WithDescription("The Entra (Azure AD) Tenant ID that serves as the identity provider.");
+    .WithDescription("The Entra (Azure AD) Tenant ID that serves as the identity provider. For development, this can be the default tenant associated with your Azure account. Use `az account show --query tenantId` to discover the tenant ID.", enableMarkdown: true);
 
-var hrmApiAadClientId = builder.AddParameter("hrmApiAadClientId", secret: true)
+var enableMcpAuth = builder.AddParameter("enableMcpAuth", value: "false", publishValueAsDefault: true)
+    .WithDescription("Whether or not to protect the MCP server with Entra ID. Requires additional Entra ID app registration configuration.");
+
+var hrmApiAadClientId = builder.AddParameter("hrmApiAadClientId", value: "unset", secret: true)
     .WithDescription("The Entra (Azure AD) Client ID for the HRM API application.");
 
-var mcpServerAadClientId = builder.AddParameter("mcpServerAadClientId", secret: true)
+var mcpServerAadClientId = builder.AddParameter("mcpServerAadClientId", value: "unset", secret: true)
     .WithDescription("The Entra (Azure AD) Client ID for the MCP Server application.");
 
-var mcpServerAadClientSecret = builder.AddParameter("mcpServerAadClientSecret", secret: true)
+var mcpServerAadClientSecret = builder.AddParameter("mcpServerAadClientSecret", value: "unset", secret: true)
     .WithDescription("The Entra (Azure AD) Client Secret for the MCP Server application.");
 
 var api = builder.AddAzureFunctionsProject<Globomantics_Hrm_Api>("hrm-api")
+    .WithEnvironment("API_ENABLE_AUTH", enableMcpAuth)
     .WithEnvironment("HRM_API_AAD_CLIENT_ID", hrmApiAadClientId)
     .WithExternalHttpEndpoints()
     .PublishAsAzureAppServiceWebsite((infra, app) => app.Kind = "functionapp,linux");
@@ -109,7 +113,7 @@ var hrmDocumentBlobs = hrmDocumentStorage
 var mcp = builder.AddAzureFunctionsProject<Globomantics_Mcp_Server>("mcp")
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.ExecutionContext.IsPublishMode ? "Production" : "Development")
     .WithEnvironment("AZURE_TENANT_ID", azureTenantId)
-    
+    .WithEnvironment("MCP_ENABLE_AUTH", enableMcpAuth)
     .WithEnvironment("HRM_API_AAD_CLIENT_ID", hrmApiAadClientId)
     .WithEnvironment("MCP_SERVER_AAD_CLIENT_ID", mcpServerAadClientId)
     .WithEnvironment("MCP_SERVER_AAD_CLIENT_SECRET", mcpServerAadClientSecret)
