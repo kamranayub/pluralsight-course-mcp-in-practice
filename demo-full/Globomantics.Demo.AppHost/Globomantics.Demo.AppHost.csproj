@@ -1,4 +1,4 @@
-<Project Sdk="Aspire.AppHost.Sdk/13.1.0">
+﻿<Project Sdk="Aspire.AppHost.Sdk/13.1.0">
 
   <ItemGroup>
     <ProjectReference Include="..\Globomantics.Hrm.Api\Globomantics.Hrm.Api.csproj" />
@@ -19,7 +19,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <UserSecretsId>1e26819d-c308-4e71-940e-08227558f410</UserSecretsId>
+    <UserSecretsId>44640097-33da-43a5-bd11-908901a6fa5a</UserSecretsId>
   </PropertyGroup>
 
 </Project>
