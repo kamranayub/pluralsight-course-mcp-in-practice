@@ -9,6 +9,7 @@ This is the full course demo project. It uses [Aspire](https://aspire.dev), a cr
 - [Azure Functions Core Tools](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local)
 - [Node.js 22+](https://nodejs.org)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) or [Podman](https://podman.io)
+- _Optional:_ [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest) for Azure integration
 - _Recommended:_ [Visual Studio Code](https://code.visualstudio.com)
 
 The Aspire CLI (`aspire`) must be installed and available on the path. You can install using the following scripts.
@@ -130,6 +131,8 @@ but some MCP tools that require Azure authentication, like `ask_about_policy` wi
 You can optionally enable Azure provisioning to try out Azure AI Search or deploy the entire project remotely to run on Azure.
 
 ### Configure Azure Integration for Aspire
+
+The [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest) is required for Azure integration in Aspire.
 
 First, begin by logging into the Azure CLI:
 
