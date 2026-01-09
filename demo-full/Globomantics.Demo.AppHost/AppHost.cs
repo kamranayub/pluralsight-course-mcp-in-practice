@@ -1,3 +1,5 @@
+#pragma warning disable ASPIREINTERACTION001 
+
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.JavaScript;
 using Azure.Identity;
@@ -38,6 +40,7 @@ var mcpServerAadClientSecret = builder.AddParameter("mcpServerAadClientSecret", 
     .WithDescription("The Entra (Azure AD) Client Secret for the MCP Server application.");
 
 var api = builder.AddAzureFunctionsProject<Globomantics_Hrm_Api>("hrm-api")
+    .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.ExecutionContext.IsPublishMode ? "Production" : "Development")
     .WithEnvironment("API_ENABLE_AUTH", enableMcpAuth)
     .WithEnvironment("HRM_API_AAD_CLIENT_ID", hrmApiAadClientId)
     .WithExternalHttpEndpoints()
@@ -102,7 +105,37 @@ var mcp = builder.AddAzureFunctionsProject<Globomantics_Mcp_Server>("mcp")
     .WithReference(hrmDocumentBlobs)
     .WithReference(api)
     .WaitFor(api)
-    .WaitFor(hrmDocumentBlobs);
+    .WaitFor(hrmDocumentBlobs)
+    .OnResourceReady(async (resource, e, cancellationToken) =>
+    {
+        var interactionService = e.Services.GetRequiredService<IInteractionService>()!;
+
+        if (!hasAzureSubscriptionSet) {
+            _ = interactionService.PromptNotificationAsync(
+                title: "Information",
+                message: "Azure subscription has not been set, some MCP tools have been disabled. Refer to README for details.",
+                options: new NotificationInteractionOptions
+                {
+                    Intent = MessageIntent.Information
+                },
+                cancellationToken: cancellationToken);
+        }
+
+        var authEnabled = await enableMcpAuth.Resource.GetValueAsync(cancellationToken);
+
+        if (bool.TryParse(authEnabled, out var enabled) && !enabled) {
+            
+            _ = interactionService.PromptNotificationAsync(
+                title: "Warning",
+                message: "MCP Authentication is disabled. MCP server is operating in Anonymous mode and is not protected. Refer to README for details.",
+                options: new NotificationInteractionOptions
+                {
+                    Intent = MessageIntent.Warning
+                },
+                cancellationToken: cancellationToken);
+            
+        }
+    });
 
 if (hasAzureSubscriptionSet) {
 

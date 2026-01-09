@@ -20,8 +20,6 @@ if (enableAuth && DefaultOpenApiConfigurationOptions.IsFunctionsRuntimeEnvironme
 builder.AddServiceDefaults();
 
 builder.Services
-    .AddApplicationInsightsTelemetryWorkerService()
-    .ConfigureFunctionsApplicationInsights()
     .Configure<JsonSerializerOptions>(options =>
     {
         options.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
