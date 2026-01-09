@@ -25,6 +25,8 @@ using Projects;
 var azureCredential = new DefaultAzureCredential();
 var builder = DistributedApplication.CreateBuilder(args);
 
+var hasAzureSubscriptionSet = builder.Configuration.GetValue<string>("Azure:SubscriptionId") is not null;
+
 var azureTenantId = builder.AddParameter("azureTenantId", secret: true)
     .WithDescription("The Entra (Azure AD) Tenant ID that serves as the identity provider.");
 
@@ -37,31 +39,39 @@ var mcpServerAadClientId = builder.AddParameter("mcpServerAadClientId", secret: 
 var mcpServerAadClientSecret = builder.AddParameter("mcpServerAadClientSecret", secret: true)
     .WithDescription("The Entra (Azure AD) Client Secret for the MCP Server application.");
 
-var appServicePlan = builder.AddAzureAppServiceEnvironment("ps-globomantics-aspire-ase")
+var api = builder.AddAzureFunctionsProject<Globomantics_Hrm_Api>("hrm-api")
+    .WithEnvironment("HRM_API_AAD_CLIENT_ID", hrmApiAadClientId)
+    .WithExternalHttpEndpoints()
+    .PublishAsAzureAppServiceWebsite((infra, app) => app.Kind = "functionapp,linux");
+
+if (hasAzureSubscriptionSet) {
+    var appServicePlan = builder.AddAzureAppServiceEnvironment("ps-globomantics-aspire-ase")
+        .ConfigureInfrastructure(infra =>
+        {
+            var resources = infra.GetProvisionableResources();
+            var plan = resources.OfType<AppServicePlan>().Single();
+
+            plan.Sku = new AppServiceSkuDescription
+            {
+                Name = "FC1",
+                Tier = "FlexConsumption"
+            };
+        });
+}
+
+var hrmDocumentStorage = builder.AddAzureStorage("hrm-documents-storage")
+    .RunAsEmulator()
     .ConfigureInfrastructure(infra =>
     {
-        var resources = infra.GetProvisionableResources();
-        var plan = resources.OfType<AppServicePlan>().Single();
+        var storageAccount = infra.GetProvisionableResources()
+            .OfType<StorageAccount>()
+            .Single();
 
-        plan.Sku = new AppServiceSkuDescription
+        infra.Add(new ProvisioningOutput("StorageAccountResourceId", typeof(string))
         {
-            Name = "FC1",
-            Tier = "FlexConsumption"
-        };
+            Value = storageAccount.Id
+        });
     });
-
-
-var hrmDocumentStorage = builder.AddAzureStorage("hrm-documents-storage").ConfigureInfrastructure(infra =>
-{
-    var storageAccount = infra.GetProvisionableResources()
-        .OfType<StorageAccount>()
-        .Single();
-
-    infra.Add(new ProvisioningOutput("StorageAccountResourceId", typeof(string))
-    {
-        Value = storageAccount.Id
-    });
-});
 
 var hrmDocumentBlobs = hrmDocumentStorage
     .AddBlobContainer("hrm-blob-service", blobContainerName: "globomanticshrdocs")
@@ -96,100 +106,99 @@ var hrmDocumentBlobs = hrmDocumentStorage
         }
     });
 
-
-var aiSearch = builder.AddAzureSearch("hrm-search-service")
-    .WithRunIndexerCommand(azureCredential)
-    .ConfigureInfrastructure(infra =>
-    {
-        var searchService = infra.GetProvisionableResources()
-                            .OfType<SearchService>()
-                            .Single();
-
-        searchService.Identity = new ManagedServiceIdentity()
-        {
-            ManagedServiceIdentityType = ManagedServiceIdentityType.SystemAssigned
-        };
-
-        infra.Add(new ProvisioningOutput("SearchServicePrincipalId", typeof(string))
-        {
-            Value = searchService.Identity.PrincipalId!
-        });
-    })
-    .OnResourceReady(async (resource, e, cancellationToken) =>
-    {
-        var logger = e.Services.GetRequiredService<ResourceLoggerService>().GetLogger(resource);
-        var searchServicePrincipalIdRaw = resource.Outputs["SearchServicePrincipalId"] as string;
-        var searchServicePrincipalId = Guid.Parse(searchServicePrincipalIdRaw!);
-        var storageAccountId = await hrmDocumentStorage.GetOutput("StorageAccountResourceId").GetValueAsync(cancellationToken);
-
-        logger.LogInformation("Discovered Search Service Principal ID: {PrincipalId}", searchServicePrincipalId);
-        logger.LogInformation("Discovered Storage Account Resource ID: {ResourceId}", storageAccountId);
-
-        var blobDataReaderRole = Guid.Parse(StorageBuiltInRole.StorageBlobDataReader.ToString());
-
-        await RoleAssignments.EnsureRoleAssignmentAsync(azureCredential, storageAccountId!, searchServicePrincipalId, blobDataReaderRole, cancellationToken);
-
-        logger.LogInformation("RBAC granted: principal {PrincipalId} -> Storage Blob Data Reader on {Scope}", searchServicePrincipalId, storageAccountId);
-    });
-
-var foundry = builder.AddAzureAIFoundry("hrm-foundry").ConfigureInfrastructure(infra =>
-{
-    var resources = infra.GetProvisionableResources();
-    var account = resources.OfType<Azure.Provisioning.CognitiveServices.CognitiveServicesAccount>().Single();
-
-    infra.Add(new ProvisioningOutput("FoundryAccountResourceId", typeof(string))
-    {
-        Value = account.Id
-    });
-
-}).OnResourceReady(async (resource, e, cancellationToken) =>
-{
-    var logger = e.Services.GetRequiredService<ResourceLoggerService>().GetLogger(resource);
-    var searchServicePrincipalIdRaw = await aiSearch.GetOutput("SearchServicePrincipalId").GetValueAsync(cancellationToken);
-    var searchServicePrincipalId = Guid.Parse(searchServicePrincipalIdRaw!);
-    var foundryAccountId = resource.Outputs["FoundryAccountResourceId"]!.ToString();
-
-    logger.LogInformation("Discovered Search Service Principal ID: {PrincipalId}", searchServicePrincipalId);
-    logger.LogInformation("Discovered AI Foundry Resource ID: {ResourceId}", foundryAccountId);
-
-    var openAiUserRole = Guid.Parse(CognitiveServicesBuiltInRole.CognitiveServicesOpenAIUser.ToString());
-
-    await RoleAssignments.EnsureRoleAssignmentAsync(azureCredential, foundryAccountId!, searchServicePrincipalId, openAiUserRole, cancellationToken);
-
-    logger.LogInformation("RBAC granted: principal {PrincipalId} -> OpenAI User on {Scope}", searchServicePrincipalId, foundryAccountId);
-});
-
-var embedding = foundry.AddDeployment("hrm-embeddings", AIFoundryModel.OpenAI.TextEmbeddingAda002)
-    .WithProperties(conf =>
-    {
-        // The capacity needs to be set high enough for the search indexer
-        // to index the PDF blob documents. By default it is set to 1k (~6 RPM)
-        // so we set it to 10k (60 RPM).
-        conf.SkuCapacity = 10;
-    });
-
-var api = builder.AddAzureFunctionsProject<Globomantics_Hrm_Api>("hrm-api")
-    .WithEnvironment("HRM_API_AAD_CLIENT_ID", hrmApiAadClientId)
-    .WithExternalHttpEndpoints()
-    .PublishAsAzureAppServiceWebsite((infra, app) => app.Kind = "functionapp,linux");
-
 var mcp = builder.AddAzureFunctionsProject<Globomantics_Mcp_Server>("mcp")
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.ExecutionContext.IsPublishMode ? "Production" : "Development")
     .WithEnvironment("AZURE_TENANT_ID", azureTenantId)
-    .WithEnvironment("HRM_SEARCH_SERVICE_INDEX_NAME", $"{aiSearch.Resource.Name}-index")
+    
     .WithEnvironment("HRM_API_AAD_CLIENT_ID", hrmApiAadClientId)
     .WithEnvironment("MCP_SERVER_AAD_CLIENT_ID", mcpServerAadClientId)
     .WithEnvironment("MCP_SERVER_AAD_CLIENT_SECRET", mcpServerAadClientSecret)
     .WithExternalHttpEndpoints()
     .PublishAsAzureAppServiceWebsite((infra, app) => app.Kind = "functionapp,linux")
     .WithReference(hrmDocumentBlobs)
-    .WithReference(aiSearch)
     .WithReference(api)
     .WaitFor(api)
-    .WaitFor(aiSearch)
-    .WaitFor(hrmDocumentBlobs)
-    .WaitFor(foundry)
-    .OnBeforeResourceStarted(async (resource, e, cancellationToken) =>
+    .WaitFor(hrmDocumentBlobs);
+
+if (hasAzureSubscriptionSet) {
+
+    var aiSearch = builder.AddAzureSearch("hrm-search-service")
+        .WithRunIndexerCommand(azureCredential)
+        .ConfigureInfrastructure(infra =>
+        {
+            var searchService = infra.GetProvisionableResources()
+                                .OfType<SearchService>()
+                                .Single();
+
+            searchService.Identity = new ManagedServiceIdentity()
+            {
+                ManagedServiceIdentityType = ManagedServiceIdentityType.SystemAssigned
+            };
+
+            infra.Add(new ProvisioningOutput("SearchServicePrincipalId", typeof(string))
+            {
+                Value = searchService.Identity.PrincipalId!
+            });
+        })
+        .OnResourceReady(async (resource, e, cancellationToken) =>
+        {
+            var logger = e.Services.GetRequiredService<ResourceLoggerService>().GetLogger(resource);
+            var searchServicePrincipalIdRaw = resource.Outputs["SearchServicePrincipalId"] as string;
+            var searchServicePrincipalId = Guid.Parse(searchServicePrincipalIdRaw!);
+            var storageAccountId = await hrmDocumentStorage.GetOutput("StorageAccountResourceId").GetValueAsync(cancellationToken);
+
+            logger.LogInformation("Discovered Search Service Principal ID: {PrincipalId}", searchServicePrincipalId);
+            logger.LogInformation("Discovered Storage Account Resource ID: {ResourceId}", storageAccountId);
+
+            var blobDataReaderRole = Guid.Parse(StorageBuiltInRole.StorageBlobDataReader.ToString());
+
+            await RoleAssignments.EnsureRoleAssignmentAsync(azureCredential, storageAccountId!, searchServicePrincipalId, blobDataReaderRole, cancellationToken);
+
+            logger.LogInformation("RBAC granted: principal {PrincipalId} -> Storage Blob Data Reader on {Scope}", searchServicePrincipalId, storageAccountId);
+        });
+
+    var foundry = builder.AddAzureAIFoundry("hrm-foundry").ConfigureInfrastructure(infra =>
+    {
+        var resources = infra.GetProvisionableResources();
+        var account = resources.OfType<Azure.Provisioning.CognitiveServices.CognitiveServicesAccount>().Single();
+
+        infra.Add(new ProvisioningOutput("FoundryAccountResourceId", typeof(string))
+        {
+            Value = account.Id
+        });
+
+    }).OnResourceReady(async (resource, e, cancellationToken) =>
+    {
+        var logger = e.Services.GetRequiredService<ResourceLoggerService>().GetLogger(resource);
+        var searchServicePrincipalIdRaw = await aiSearch.GetOutput("SearchServicePrincipalId").GetValueAsync(cancellationToken);
+        var searchServicePrincipalId = Guid.Parse(searchServicePrincipalIdRaw!);
+        var foundryAccountId = resource.Outputs["FoundryAccountResourceId"]!.ToString();
+
+        logger.LogInformation("Discovered Search Service Principal ID: {PrincipalId}", searchServicePrincipalId);
+        logger.LogInformation("Discovered AI Foundry Resource ID: {ResourceId}", foundryAccountId);
+
+        var openAiUserRole = Guid.Parse(CognitiveServicesBuiltInRole.CognitiveServicesOpenAIUser.ToString());
+
+        await RoleAssignments.EnsureRoleAssignmentAsync(azureCredential, foundryAccountId!, searchServicePrincipalId, openAiUserRole, cancellationToken);
+
+        logger.LogInformation("RBAC granted: principal {PrincipalId} -> OpenAI User on {Scope}", searchServicePrincipalId, foundryAccountId);
+    });
+
+    var embedding = foundry.AddDeployment("hrm-embeddings", AIFoundryModel.OpenAI.TextEmbeddingAda002)
+        .WithProperties(conf =>
+        {
+            // The capacity needs to be set high enough for the search indexer
+            // to index the PDF blob documents. By default it is set to 1k (~6 RPM)
+            // so we set it to 10k (60 RPM).
+            conf.SkuCapacity = 10;
+        });
+
+    mcp
+        .WithEnvironment("HRM_SEARCH_SERVICE_INDEX_NAME", $"{aiSearch.Resource.Name}-index")
+        .WithReference(aiSearch)
+        .WaitFor(aiSearch)
+        .WaitFor(foundry)
+        .OnBeforeResourceStarted(async (resource, e, cancellationToken) =>
     {
         var logger = e.Services.GetRequiredService<ResourceLoggerService>().GetLogger(resource);
         var config = e.Services.GetRequiredService<IConfiguration>();
@@ -243,6 +252,7 @@ var mcp = builder.AddAzureFunctionsProject<Globomantics_Mcp_Server>("mcp")
 
         logger.LogInformation("Successfully provisioned AI Search index, vectorizer, skillset, and data source for HRM data.");
     });
+}
 
 var mcpEndpoint = mcp.GetEndpoint("http");
 
