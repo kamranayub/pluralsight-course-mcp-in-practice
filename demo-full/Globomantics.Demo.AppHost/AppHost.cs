@@ -48,21 +48,6 @@ var api = builder.AddAzureFunctionsProject<Globomantics_Hrm_Api>("hrm-api")
     .WithExternalHttpEndpoints()
     .PublishAsAzureAppServiceWebsite((infra, app) => app.Kind = "functionapp,linux");
 
-if (hasAzureSubscriptionSet) {
-    var appServicePlan = builder.AddAzureAppServiceEnvironment("ps-globomantics-aspire-ase")
-        .ConfigureInfrastructure(infra =>
-        {
-            var resources = infra.GetProvisionableResources();
-            var plan = resources.OfType<AppServicePlan>().Single();
-
-            plan.Sku = new AppServiceSkuDescription
-            {
-                Name = "FC1",
-                Tier = "FlexConsumption"
-            };
-        });
-}
-
 var hrmDocumentStorage = builder.AddAzureStorage("hrm-documents-storage")
     .RunAsEmulator()
     .ConfigureInfrastructure(infra =>
@@ -126,6 +111,19 @@ var mcp = builder.AddAzureFunctionsProject<Globomantics_Mcp_Server>("mcp")
 
 if (hasAzureSubscriptionSet) {
 
+    var appServicePlan = builder.AddAzureAppServiceEnvironment("ps-globomantics-aspire-ase")
+        .ConfigureInfrastructure(infra =>
+        {
+            var resources = infra.GetProvisionableResources();
+            var plan = resources.OfType<AppServicePlan>().Single();
+
+            plan.Sku = new AppServiceSkuDescription
+            {
+                Name = "FC1",
+                Tier = "FlexConsumption"
+            };
+        });
+        
     var aiSearch = builder.AddAzureSearch("hrm-search-service")
         .WithRunIndexerCommand(azureCredential)
         .ConfigureInfrastructure(infra =>
