@@ -1,0 +1,25 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.1.0">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Globomantics.Hrm.Api\Globomantics.Hrm.Api.csproj" />
+    <ProjectReference Include="..\Globomantics.Mcp.Server\Globomantics.Mcp.Server.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Azure.AIFoundry" Version="13.1.0-preview.1.25616.3" />
+    <PackageReference Include="Aspire.Hosting.Azure.AppService" Version="13.1.0-preview.1.25616.3" />
+    <PackageReference Include="Aspire.Hosting.Azure.Functions" Version="13.1.0" />
+    <PackageReference Include="Aspire.Hosting.Azure.Search" Version="13.1.0" />
+    <PackageReference Include="Azure.Search.Documents" Version="11.8.0-beta.1" />
+    <PackageReference Include="CommunityToolkit.Aspire.Hosting.McpInspector" Version="13.0.1-beta.468" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>1e26819d-c308-4e71-940e-08227558f410</UserSecretsId>
+  </PropertyGroup>
+
+</Project>

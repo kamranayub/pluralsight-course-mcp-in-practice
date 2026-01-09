@@ -1,0 +1,16 @@
+{
+  "name": "globomantics.demo.apphost",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "patch:mcp": "patch-package"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/inspector": "0.18.0",
+    "patch-package": "^8.0.1"
+  }
+}
