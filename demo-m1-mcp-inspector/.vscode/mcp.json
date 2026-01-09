@@ -1,0 +1,9 @@
+{
+    "servers": {
+        "globomantics-mcp-server-local": {            
+            "command": "npm",
+            "args": ["run", "dev"],
+            "cwd": "${workspaceFolder}"
+        }
+    }
+}
