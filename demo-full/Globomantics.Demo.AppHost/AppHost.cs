@@ -1,8 +1,5 @@
-using System.Reflection.Metadata;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.JavaScript;
-using Aspire.Hosting.Pipelines;
-using Azure;
 using Azure.Identity;
 using Azure.Provisioning;
 using Azure.Provisioning.AppService;
@@ -10,13 +7,11 @@ using Azure.Provisioning.CognitiveServices;
 using Azure.Provisioning.Resources;
 using Azure.Provisioning.Search;
 using Azure.Provisioning.Storage;
-using Azure.ResourceManager.Authorization.Models;
 using Azure.Search.Documents.Indexes;
 using Azure.Search.Documents.Indexes.Models;
 using Azure.Storage.Blobs;
 using Globomantics.Demo.AppHost.Roles;
 using Globomantics.Demo.AppHost.Search;
-using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -25,21 +20,21 @@ using Projects;
 var azureCredential = new DefaultAzureCredential();
 var builder = DistributedApplication.CreateBuilder(args);
 
-var hasAzureSubscriptionSet = builder.Configuration.GetValue<string>("Azure:SubscriptionId") is not null;
+var hasAzureSubscriptionSet = !string.IsNullOrWhiteSpace(builder.Configuration.GetValue<string>("Azure:SubscriptionId"));
 
-var azureTenantId = builder.AddParameter("azureTenantId", secret: true)
+var azureTenantId = builder.AddParameter("azureTenantId", value: "", secret: true)
     .WithDescription("The Entra (Azure AD) Tenant ID that serves as the identity provider. For development, this can be the default tenant associated with your Azure account. Use `az account show --query tenantId` to discover the tenant ID.", enableMarkdown: true);
 
 var enableMcpAuth = builder.AddParameter("enableMcpAuth", value: "false", publishValueAsDefault: true)
     .WithDescription("Whether or not to protect the MCP server with Entra ID. Requires additional Entra ID app registration configuration.");
 
-var hrmApiAadClientId = builder.AddParameter("hrmApiAadClientId", value: "unset", secret: true)
+var hrmApiAadClientId = builder.AddParameter("hrmApiAadClientId", value: "", secret: true)
     .WithDescription("The Entra (Azure AD) Client ID for the HRM API application.");
 
-var mcpServerAadClientId = builder.AddParameter("mcpServerAadClientId", value: "unset", secret: true)
+var mcpServerAadClientId = builder.AddParameter("mcpServerAadClientId", value: "", secret: true)
     .WithDescription("The Entra (Azure AD) Client ID for the MCP Server application.");
 
-var mcpServerAadClientSecret = builder.AddParameter("mcpServerAadClientSecret", value: "unset", secret: true)
+var mcpServerAadClientSecret = builder.AddParameter("mcpServerAadClientSecret", value: "", secret: true)
     .WithDescription("The Entra (Azure AD) Client Secret for the MCP Server application.");
 
 var api = builder.AddAzureFunctionsProject<Globomantics_Hrm_Api>("hrm-api")
@@ -262,7 +257,7 @@ mcp.WithEnvironment("WEBSITE_HOSTNAME", ReferenceExpression.Create(
     $"{mcpEndpoint.Property(EndpointProperty.Host)}:{mcpEndpoint.Property(EndpointProperty.Port)}"));
 
 var mcpPatcher = builder
-    .AddResource(new JavaScriptAppResource("mcp-patcher", "npx", ""))
+    .AddResource(new JavaScriptAppResource("mcp-inspector-entra-patch", "npx", ""))
     .WithNpm(install: true)
     .WithCommand("npm")
     .WithArgs("run", "patch:mcp");

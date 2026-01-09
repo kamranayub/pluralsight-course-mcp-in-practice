@@ -1,12 +1,9 @@
 {
   "profiles": {
-    "McpServer": {
+    "Globomantics.Mcp.Server": {
       "commandName": "Project",
-      "dotnetRunMessages": true,
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      },
-      "applicationUrl": "http://localhost:5000"
+      "commandLineArgs": "--port 5000",
+      "launchBrowser": false
     }
   }
 }

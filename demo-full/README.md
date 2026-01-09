@@ -4,6 +4,13 @@ This is the full course demo project. It uses [Aspire](https://aspire.dev), a cr
 
 ## Prerequisites
 
+- Follow the [Aspire](https://aspire.dev/get-started/prerequisites/) prerequisites guide
+- [.NET 8 SDK](https://get.dot.net/8) and the [.NET 10 SDK](https://get.dot.net/10)
+- [Azure Functions Core Tools](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local)
+- [Node.js 22+](https://nodejs.org)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) or [Podman](https://podman.io)
+- _Recommended:_ [Visual Studio Code](https://code.visualstudio.com)
+
 The Aspire CLI (`aspire`) must be installed and available on the path. You can install using the following scripts.
 
 On Windows:
@@ -14,8 +21,15 @@ On Linux or macOS:
 
     curl -sSL https://aspire.dev/install.sh | bash
 
-> [!IMPORTANT]
-> You will need the [.NET 8 SDK](https://get.dot.net/8) to use Aspire, and the [.NET 10 SDK](https://get.dot.net/8). Use `dotnet --list-sdks` to check!
+Run the following commands to verify your environment is set up correctly:
+
+```sh
+dotnet --list-sdks # Should include 8.x and 10.x
+node -v # Should be 22.x or above
+npm -v # Should be 10.x or above
+aspire --version # Should be 13.1 or above
+func -v # Should be 4.6.0 or above
+```
 
 ## Get Started
 
@@ -25,7 +39,88 @@ In the demo directory, run Aspire:
 aspire run
 ```
 
-The environment will be spun up locally and should be fully operable on your local machine.
+> [!IMPORTANT]
+> If this is your first time running an Aspire project, the `aspire run` command will prompt you to **Trust certificates**. On Windows and macOS, you can follow the prompts. These are required for the local development environment to use HTTPS.
+
+If everything is working, you will Aspire print out the service information like this:
+
+```sh
+
+     AppHost:  Globomantics.Demo.AppHost/Globomantics.Demo.AppHost.csproj                 
+                                                                                          
+   Dashboard:  https://localhost:17006/login?t=unique-code        
+                                                                                          
+        Logs:  /Users/kamranicus/.aspire/cli/logs/apphost-10541-2026-01-09-16-26-56.log   
+                                                            
+               Press CTRL+C to stop the apphost and exit. 
+```
+
+Follow the **Dashboard** link to view the Aspire dashboard and find your service URLs.
+
+The following Aspire resources should be **Healthy**:
+
+- `mcp` - MCP server project (C#) hosted by default at `http://localhost:5000`
+- `mcp-inspector` - MCP inspector (npx) hosted by default at `http://localhost:6274`
+- `mcp-patcher` - Fixes a known issue with MCP Inspector that makes it incompatible with Entra ID-based OAuth flows
+- `hrm-api` - Azure Functions project hosted on `http://localhost:7040`
+- `hrm-documents-storage` - Azure blob storage (with PDFs pre-baked)
+- `funcstorage...` - Azure Functions project backing storage
+
+## Using the MCP Inspector
+
+Aspire has provisioned the MCP Inspector (`mcp-inspector`) resource. Click the **Client** link in the Dashboard to connect to your MCP server!
+
+## Connecting to the MCP Server
+
+In your AI tool MCP configuration, you can follow the guide in the course or in tool documentation. The URL should be `http://localhost:5000`, but you
+can view the MCP server URL in the Aspire Dashboard (the `mcp` resource).
+
+### Visual Studio Code (default)
+
+In the `.vscode/mcp.json` configuration, the MCP server is already set up:
+
+```json
+{
+    "servers": {
+        "globomantics-mcp-server-local": {            
+            "type": "http",
+            "url": "http://localhost:5000/"
+        }
+    }
+}
+```
+
+Just click the **Start** command over the MCP server name to start it. Reference the course or [VS Code documentation](https://code.visualstudio.com/docs/copilot/customization/mcp-servers) for how to use with Copilot Agent mode.
+
+### Claude Desktop (optional)
+
+In the course, Claude is used to demo the MCP server for STDIO and Streamable HTTP transport. With authentication disabled, you can configure the MCP server in `claude_desktop_config.json` (Settings -> Developer):
+
+```json
+{
+    "mcpServers": {
+        "globomantics-mcp-server-local": {            
+            "type": "http",
+            "url": "http://localhost:5000/"
+        }
+    }
+}
+```
+
+This is shown step-by-step in the course or you can [reference this guide by MCPBundles](https://www.mcpbundles.com/blog/claude-desktop-mcp#claude-desktop-mcp-config-file-location).
+
+### ChatGPT (web only)
+
+In order to use MCP servers with ChatGPT, you need to enable [Developer Mode](https://platform.openai.com/docs/guides/developer-mode).
+
+> [!IMPORTANT]
+> This is only available on the **Web** and on paid plans.
+
+This requires you to deploy your MCP server, which you can find how to in the [Deploying the Project](#deploying-the-project) section.
+
+> [!IMPORTANT]
+> `enableAuth` must be `false` in your Aspire project as Entra ID is only supported by Visual Studio Code's MCP integration. In the **Advanced** MCP course,
+> we introduce an Auth Gateway that makes your OAuth-protected MCP server compatible with all MCP clients.
 
 ## Azure Provisioning (optional)
 
@@ -83,7 +178,7 @@ When provided an Azure subscription ID and an Entra tenant ID, Aspire will provi
 
 
 
-## Deploying the Project (optional)
+# Deploying the Project
 
 > [!DANGER]
 > This is not fully implemented. It requires custom Azure Bicep configuration that is not yet
