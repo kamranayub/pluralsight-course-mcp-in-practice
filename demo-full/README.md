@@ -1,13 +1,42 @@
 # Full Demo
 
-This is the full demo that will provision Azure infrastructure, if you choose.
+This is the full course demo project. It uses [Aspire](https://aspire.dev), a cross-platform Infrastructure-as-Code (IaC) local development environment.
+
+## Prerequisites
+
+The Aspire CLI (`aspire`) must be installed and available on the path. You can install using the following scripts.
+
+On Windows:
+
+    iex "& { $(irm https://aspire.dev/install.ps1) }"
+
+On Linux or macOS:
+
+    curl -sSL https://aspire.dev/install.sh | bash
 
 > [!IMPORTANT]
-> Provisioning Azure infrastructure will cost money. Please be advised you should delete
-> the resource group after you're done exploring and running the demo. **It is not
-> deleted automatically.**
+> You will need the [.NET 8 SDK](https://get.dot.net/8) to use Aspire, and the [.NET 10 SDK](https://get.dot.net/8). Use `dotnet --list-sdks` to check!
 
-First, begin by logining into the Azure CLI:
+## Get Started
+
+In the demo directory, run Aspire:
+
+```sh
+aspire run
+```
+
+The environment will be spun up locally and should be fully operable on your local machine.
+
+## Azure Provisioning (optional)
+
+By default, Aspire will not provision any Azure infrastructure and authentication is disabled. This is the easiest way to run the course demos
+but some MCP tools that require Azure authentication, like `ask_about_policy` will be disabled. The rest will work locally!
+
+You can optionally enable Azure provisioning to try out Azure AI Search or deploy the entire project remotely to run on Azure.
+
+### Configure Azure Integration for Aspire
+
+First, begin by logging into the Azure CLI:
 
 ```sh
 az login
@@ -22,21 +51,43 @@ dotnet user-secrets set "Azure:SubscriptionId" "your-subscription-id" --project 
 dotnet user-secrets set "Azure:Location" "eastus" --project ./Globomantics.Demo.AppHost
 ```
 
-Now, run with Aspire:
+You will also need an Entra tenant ID, which can be the default tenant:
+
+```sh
+az account show --query tenantId
+```
+
+This will output your tenant ID quoted in a string, like `"<tenant_id>"`. Copy the tenant ID (without quotes) and set another user secret:
+
+```sh
+dotnet user-secrets set "Parameters:azureTenantId" "your-tenant-id" --project ./Globomantics.Demo.AppHost
+```
+
+> [!TIP]
+> If you don't provide the `azureTenantId` parameter, Aspire will prompt you to add it in the Dashboard before
+> any of the dependent resources will be started.
+
+Now run Aspire:
 
 ```sh
 aspire run
 ```
 
-The environment will be spun up locally and should be fully operable on your local machine.
+When provided an Azure subscription ID and an Entra tenant ID, Aspire will provision the following resources:
 
-> [!NOTE]
-> The provisioned resources will be limited to Azure AI Foundry and Search.
-> You can choose to opt-out of these services, in which case various MCP tools
-> will be disabled automatically.
->
-> The other resources like Azure Storage will work locally with the Azurite emulator,
-> and Azure Functions can also run locally.
+- `hrm-search-service` - Azure AI Search Service
+- `hrm-foundry` - Azure AI Foundry
+- `hrm-embeddings` - Foundry-deployed OpenAI model for text-embedding-ada-002
+
+## Enabling Authentication (optional)
+
+
+
+## Deploying the Project (optional)
+
+> [!DANGER]
+> This is not fully implemented. It requires custom Azure Bicep configuration that is not yet
+> migrated to Aspire, but can be found in the `master` branch.
 
 **Optionally,** you can deploy the MCP server and HRM API to Azure with Aspire:
 
@@ -59,6 +110,13 @@ To set up and provision all the infrastructure for this course, there's a mix of
 1. Configure MCP Server
 
 There are **two** Azure Bicep projects: `azure.yaml` and `Globomantics.Mcp.Server/azure.yaml`. These will provision **two separate resource groups** to maintain separation between the "mock infra" and the actual MCP server. They could be combined, if you want.
+
+---
+
+# Old Documentation (Not Yet Migrated)
+
+> [!WARNING]
+> The following docs have not yet been updated to reflect the Aspire project.
 
 ### Prerequisite: Entra Tenant Configuration
 
