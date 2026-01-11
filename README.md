@@ -16,75 +16,38 @@ This repository is for the Pluralsight course **[Model Context Protocol in Pract
 ## Demos
 
 This is an intermediate-level course about the practical aspects of building an MCP server with a real enterprise use case. 
-It is not a step-by-step tutorial on how to build an MCP server end-to-end, since
-the course is not designed to be around a specific tech stack like FastMCP, TypeScript, or even .NET. The MCP documentation and
+It is not a step-by-step how-to on how to build an MCP server end-to-end, since
+that would depend on the specific tech stack like FastMCP, TypeScript, or .NET. The MCP documentation and
 various SDKs do a great job with basic tutorials and examples.
 
 The demos are meant to be for reference and learning, not for running in production. That said, the full source code
-is provided so you _can_ see how to build and deploy a remote MCP server on Azure.
-
-### Prerequisites
-
-If you want to compile and build the code, you will need:
-
-- [.NET 8 and 10 SDKs](https://get.dot.net)
-- [Node.js 22 or 24 LTS](https://nodejs.org)
-- Visual Studio Code (recommended)
-  - _Requires:_ [C# Devkit extension](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csdevkit)
-  - _Recommended:_ [Azure Functions extension](https://marketplace.visualstudio.com/items?itemName=ms-azuretools.vscode-azurefunctions)
-
-If you want to _run_ the demos, you will need:
-
-**Azure Infrastructure**
-
-- [A Microsoft Azure subscription](https://azure.com)
-- [Azure Functions Core Tools](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local)
-- [Azurite extension](https://learn.microsoft.com/en-us/azure/storage/common/storage-install-azurite) (recommended, for local storage emulation)
-- A Microsoft Entra ID tenant (for OAuth flows)
-- Azure Blob storage account
-  - With uploaded PDFs from course materials
-- Azure AI Foundry project
-  - With a model deployment for `text-embedding-ada-002`
-- Azure AI Search Service
-  - Blob storage data source
-  - Skillset
-  - Search Index
-  - Search Indexer
-- Role-based security and managed identity setup
-
-The details on infrastructure provisioning can be found in each module's `README.md`.
-
-**MCP Client**
-
-- From M1 to M3, the MCP server can be [connected to](https://modelcontextprotocol.io/docs/develop/connect-local-servers) by AI tools like VS Code, Claude, Cursor, and others.
-- In M4, a Protected MCP server (OAuth) is introduced and is **only** compatible with VS Code due to restrictions with Microsoft Entra ID.
+is provided so you _can_ see how to build and deploy a remote MCP server on Azure. You can run all the demos locally 
+**without Azure or OAuth infrastructure.**
 
 ### Folder Structure
 
-Each module folder represents the end-state of the demo:
+#### **everything-mcp-server**
 
-- **demo-final**: Full Azure infrastructure and MCP server
+Full end-to-end local/remote MCP server with backend API and optional Azure AI Search
 
-The simplest demo to run:
+This is the **main demo project** that contains tools, resources, and prompts. It is designed to be configured
+so that it reflects each module in different "modes", in increasing level of complexity:
 
-- **demo-m1:** Basic scaffolded MCP server
+- **Module 2:** Local stdio MCP server
+- **Module 3:** Local Streamable HTTP MCP server
+- **Module 3:** Remote MCP Server on Azure Functions
+- **Module 4:** Protected MCP Server on Azure Functions with Entra ID
 
-The rest of the modules demo a C# MCP server running outside/within Azure:
+Follow the [README.md](everything-mcp-server/README.md) for how to configure and run the Everything Demo Server.
 
-- **demo-m2:** Local MCP server
-- **demo-m3:** Deployed remote MCP server
-- **demo-m4:** Protected MCP server
+#### Other Demos
 
-Each demo folder is meant to be opened in its own VS Code workspace.
+The following demos are the simplest but don't contain any tools, resources, or prompts:
 
-> [!IMPORTANT]
-> All the Azure-based MCP server demos **require a Microsoft Azure subscription** and
-> additional resources to be provisioned in order to run. They are meant to be an enterprise-grade _reference_
-> implementation, not necessarily demos you can run out-of-the-box. See the [Resources](#additional-resources)
-> section below for smaller demos, samples, and documentation.
+- **m1-empty:** Module 1, Empty scaffolded MCP server without tools
+- **m1-inspector:** Module 1, Empty MCP server with Inspector configured
+- **token-counting:** Module 2, The Anthropic token counting demo shown in the course
 
-Each one has notes in the `README.md` files you can refer to if you want
-to run the demos yourself.
 
 ## Errata
 
@@ -96,6 +59,7 @@ Please report course issues using the [Issues](issues) page or the Pluralsight d
 
 - **January 2026**
   - Fixed a typo causing `demo-final` to fail to build
+  - Added Aspire-based demos for ease of use
 
 - **December 2025**
   - Initial release 🎉

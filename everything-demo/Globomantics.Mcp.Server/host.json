@@ -1,0 +1,13 @@
+{
+    "version": "2.0",
+    "configurationProfile": "mcp-custom-handler",
+    "customHandler": {
+        "description": {
+            "defaultExecutablePath": "dotnet",
+            "arguments": ["Globomantics.Mcp.Server.dll"]
+        },
+        "http": {
+            "DefaultAuthorizationLevel": "anonymous"
+        }
+    }
+}

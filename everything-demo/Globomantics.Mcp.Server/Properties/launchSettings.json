@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "Globomantics.Mcp.Server": {
+      "commandName": "Project",
+      "commandLineArgs": "--port 5000",
+      "launchBrowser": false
+    }
+  }
+}

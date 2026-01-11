@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "globomantics-hrm": {
+      "command": "dotnet",
+      "args": ["run", "--project", "Globomantics.Mcp.Server/Globomantics.Mcp.Server.csproj"]
+    }
+  }
+}

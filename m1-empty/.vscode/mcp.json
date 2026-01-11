@@ -1,0 +1,13 @@
+{
+    "servers": {
+        "globomantics-mcp-server-local": {            
+            "command": "dotnet",
+            "args": [ 
+                "run",
+                "--project",
+                "Globomantics.Mcp.Server/Globomantics.Mcp.Server.csproj"
+            ],
+            "cwd": "${workspaceFolder}"
+        }
+    }
+}

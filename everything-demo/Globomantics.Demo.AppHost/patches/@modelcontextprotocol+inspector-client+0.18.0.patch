@@ -1,0 +1,24 @@
+diff --git a/node_modules/@modelcontextprotocol/inspector-client/dist/assets/index-Dw52pmVD.js b/node_modules/@modelcontextprotocol/inspector-client/dist/assets/index-Dw52pmVD.js
+index d37e185..18687cc 100644
+--- a/node_modules/@modelcontextprotocol/inspector-client/dist/assets/index-Dw52pmVD.js
++++ b/node_modules/@modelcontextprotocol/inspector-client/dist/assets/index-Dw52pmVD.js
+@@ -17537,8 +17537,7 @@ const oauthTransitions = {
+           clientInformation,
+           redirectUrl: context.provider.redirectUrl,
+           scope: scope2,
+-          state: generateOAuthState(),
+-          resource: context.state.resource ?? void 0
++          state: generateOAuthState()
+         }
+       );
+       context.provider.saveCodeVerifier(codeVerifier);
+@@ -17576,8 +17575,7 @@ const oauthTransitions = {
+         clientInformation,
+         authorizationCode: context.state.authorizationCode,
+         codeVerifier,
+-        redirectUri: context.provider.redirectUrl,
+-        resource: context.state.resource ? context.state.resource instanceof URL ? context.state.resource : new URL(context.state.resource) : void 0
++        redirectUri: context.provider.redirectUrl
+       });
+       context.provider.saveTokens(tokens);
+       context.updateState({
