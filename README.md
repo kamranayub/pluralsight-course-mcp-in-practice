@@ -16,67 +16,37 @@ This repository is for the Pluralsight course **[Model Context Protocol in Pract
 ## Demos
 
 This is an intermediate-level course about the practical aspects of building an MCP server with a real enterprise use case. 
-It is not a step-by-step tutorial on how to build an MCP server end-to-end, since
-the course is not designed to be around a specific tech stack like FastMCP, TypeScript, or even .NET. The MCP documentation and
+It is not a step-by-step how-to on how to build an MCP server end-to-end, since
+that would depend on the specific tech stack like FastMCP, TypeScript, or .NET. The MCP documentation and
 various SDKs do a great job with basic tutorials and examples.
 
 The demos are meant to be for reference and learning, not for running in production. That said, the full source code
-is provided so you _can_ see how to build and deploy a remote MCP server on Azure.
-
-### Prerequisites
-
-- [Aspire 13.1+](https://aspire.dev) cross-platform development platform and orchestrator
-  - _Required:_ [Docker](https://docker.com) or [Podman](https://podman.io/)
-  - _Required:_ [.NET 8 and 10 SDKs](https://get.dot.net)
-- [Node.js 22+](https://nodejs.org)
-- [Azure Functions Core Tools](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local)
-- Visual Studio Code (recommended)
-  - _Requires:_ [C# Devkit extension](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csdevkit)
-  - _Recommended:_ [Aspire extension](https://marketplace.visualstudio.com/items?itemName=microsoft-aspire.aspire-vscode)
-  - _Recommended:_ [Azure Functions extension](https://marketplace.visualstudio.com/items?itemName=ms-azuretools.vscode-azurefunctions)
-  - _Recommended:_ [Azurite extension](https://learn.microsoft.com/en-us/azure/storage/common/storage-install-azurite) (recommended, for local storage emulation)
-
-> [!IMPORTANT]
-> In order to run some demos (M3 and M4), you will need an active [Microsoft Azure](https://azure.com) subscription and be logged in using the [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest). See [how Aspire Azure Local Provisioning works](https://aspire.dev/integrations/cloud/azure/local-provisioning/).
-
-**MCP Client Compatibility**
-
-- From M1 to M3, the MCP server can be [connected to](https://modelcontextprotocol.io/docs/develop/connect-local-servers) by AI tools like VS Code, Claude, Cursor, and others.
-- In M4, a Protected MCP server (OAuth) is introduced and is **only** compatible with VS Code due to restrictions with Microsoft Entra ID.
-
-### How to Run
-
-Each demo folder is meant to be opened in its own VS Code workspace, and has its own `README.md`
-that explains the prerequisites required to run.
-
-The demos use [Aspire](https://aspire.dev) to make it easier to provision a local cloud-native development
-environment with fully orchestrated and connected services. It's like Docker Compose but code-first.
-
-You can run every demo with a single command:
-
-```sh
-aspire run
-```
-
-However, each demo have have parameters or prerequisites before all the services will become :green_circle: Healthy.
+is provided so you _can_ see how to build and deploy a remote MCP server on Azure. You can run all the demos locally 
+**without Azure or OAuth infrastructure.**
 
 ### Folder Structure
 
-Each module folder represents the end-state of the demo:
+#### **everything-mcp-server**
 
-- **demo-full**: Fully provisioned Azure infrastructure and MCP server
+Full end-to-end local/remote MCP server with backend API and optional Azure AI Search
 
-Each module demo is designed to work locally:
+This is the **main demo project** that contains tools, resources, and prompts. It is designed to be configured
+so that it reflects each module in different "modes", in increasing level of complexity:
 
-- **demo-m1:** Basic scaffolded MCP server
-- **demo-m2:** Local MCP server
-- **demo-m3:** Local or Remote Azure Functions MCP server
-- **demo-m4:** Protected MCP server with Entra ID
+- **Module 2:** Local stdio MCP server
+- **Module 3:** Local Streamable HTTP MCP server
+- **Module 3:** Remote MCP Server on Azure Functions
+- **Module 4:** Protected MCP Server on Azure Functions with Entra ID
 
-> [!IMPORTANT]
-> Some tools like `AskAboutPolicy` and `PlanTimeOff` require an Azure AI search instance. The MCP server is
-> designed to disable tools that don't have the required infrastructure provisioned. If you choose to
-> use an Azure subscription, the required resources will be provisioned automatically for you.
+Follow the [README.md](everything-mcp-server/README.md) for how to configure and run the Everything Demo Server.
+
+#### Other Demos
+
+The following demos are the simplest but don't contain any tools, resources, or prompts:
+
+- **m1-empty:** Module 1, Empty scaffolded MCP server without tools
+- **m1-inspector:** Module 1, Empty MCP server with Inspector configured
+- **token-counting:** Module 2, The Anthropic token counting demo shown in the course
 
 
 ## Errata
