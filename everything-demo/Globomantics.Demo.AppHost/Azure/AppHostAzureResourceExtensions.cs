@@ -52,6 +52,8 @@ public static class AppHostAzureResourceExtensions
                 .WithEnvironment("MCP_SERVER_AAD_CLIENT_ID", mcpServerAadClientId)
                 .WithEnvironment("MCP_SERVER_AAD_CLIENT_SECRET", mcpServerAadClientSecret);
 
+            hrmApi.WithEnvironment("HRM_API_AAD_CLIENT_ID", hrmApiAadClientId);
+
             if (builder.ExecutionContext.IsPublishMode) 
             {
                 var hrmApiBicep = builder.AddBicepTemplate("hrm-api-bicep", "infra/hrm-api-auth.bicep")            
@@ -59,8 +61,7 @@ public static class AppHostAzureResourceExtensions
                     .WithParameter("clientId", hrmApiAadClientId)
                     .WithParameter("mcpClientId", mcpServerAadClientId);
 
-                hrmApi
-                    .WithEnvironment("HRM_API_AAD_CLIENT_ID", hrmApiAadClientId)                    
+                hrmApi                
                     .WithEnvironment("MICROSOFT_PROVIDER_AUTHENTICATION_SECRET", hrmApiAadClientSecret);
             }
         }

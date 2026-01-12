@@ -23,6 +23,8 @@ This is the full course demo project. It uses [Aspire](https://aspire.dev), a cr
     - [Enabling Authentication](#enabling-authentication)
     - [HRM API Entra App Registration](#hrm-api-entra-app-registration)
     - [MCP Server Entra App Registration](#mcp-server-entra-app-registration)
+    - [Troubleshooting](#troubleshooting)
+        - [The redirect URI specified in the request does not match](#the-redirect-uri-specified-in-the-request-does-not-match)
 - [Infrastructure](#infrastructure)
     - [Prerequisite: Entra Tenant Configuration](#prerequisite-entra-tenant-configuration)
         - [Configuring App Delegation / Impersonation](#configuring-app-delegation--impersonation)
@@ -389,6 +391,18 @@ delegated API permission scope.
 The MCP server will also be protected by Entra ID, via the OAuth support in the MCP C# SDK. This requires
 another separate app registration with a client secret credential. Since some clients will connect via OAuth flows
 from the browser, you will also need to configure Redirect URIs.
+
+### Troubleshooting
+
+#### The redirect URI specified in the request does not match
+
+When signing in from the MCP Inspector to the MCP server through the OAuth flow, you may receive the following error from Microsoft Entra:
+
+> AADSTS50011: The redirect URI 'http://localhost:6274/oauth/callback/debug' specified in the request does not match the redirect URIs configured for the application 'client_id'.
+
+The problem is that you do not have the MCP Inspector OAuth callback added as a Redirect URI in the Entra app registration for the MCP server.
+
+Revisit the configuration steps above to ensure you've added the redirect URI under the "Single-page Application" Redirect URIs.
 
 # Deploying the Project
 
