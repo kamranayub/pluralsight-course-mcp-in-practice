@@ -140,7 +140,10 @@ First, begin by logging into the Azure CLI:
 az login
 ```
 
-Choose your Azure subscription and note its `SubscriptionId`.
+This will trigger a login flow and afterwards it will ask you to select your subscription. Choose the Azure subscription you want to deploy resources in and note its `SubscriptionId`.
+
+> [!TIP]
+> You can also query your subscription ID with `az account show --query id`
 
 Then, add the following Azure subscription secrets:
 
