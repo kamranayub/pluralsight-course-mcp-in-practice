@@ -18,7 +18,6 @@ using RestEase;
 var builder = WebApplication.CreateBuilder(args);
 var enableMcpAuth = builder.Configuration.GetValue<bool>("MCP_ENABLE_AUTH");
 
-// builder.AddFunctionHostUrls();
 builder.AddServiceDefaults();
 
 builder.Services.AddCors(options =>
