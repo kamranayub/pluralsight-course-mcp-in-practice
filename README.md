@@ -26,28 +26,27 @@ is provided so you _can_ see how to build and deploy a remote MCP server on Azur
 
 ### Folder Structure
 
-#### **everything-mcp-server**
+#### **Modules 3 and 4**
 
-Full end-to-end local/remote MCP server with backend API and optional Azure AI Search
+The [`everything-demo`](everything-demo) server is a full end-to-end local/remote MCP server that connects to a backend API and optionally, performs a RAG vector search with Azure AI Search.
 
-This is the **main demo project** that contains tools, resources, and prompts. It is designed to be configured
+This is the **main demo project** that contains all the tools, resources, and prompts shown in the course. It is designed to be configured
 so that it reflects each module in different "modes", in increasing level of complexity:
 
-- **Module 2:** Local stdio MCP server
 - **Module 3:** Local Streamable HTTP MCP server
-- **Module 3:** Remote MCP Server on Azure Functions
-- **Module 4:** Protected MCP Server on Azure Functions with Entra ID
+- **Module 3:** Remote MCP server deployed to Azure Functions
+- **Module 4:** Remote MCP server deployed to Azure Functions and protected with Entra ID
 
-Follow the [README.md](everything-mcp-server/README.md) for how to configure and run the Everything Demo Server.
+Follow the [README.md](everything-demo/README.md) for how to configure and run the Everything Demo Server.
 
 #### Other Demos
 
-The following demos are the simplest but don't contain any tools, resources, or prompts:
-
-- **m1-empty:** Module 1, Empty scaffolded MCP server without tools
-- **m1-inspector:** Module 1, Empty MCP server with Inspector configured
-- **token-counting:** Module 2, The Anthropic token counting demo shown in the course
-
+- **Module 1**
+  - `m1-empty`: Empty scaffolded MCP server without tools
+  - `m1-inspector`: Empty MCP server with Inspector configured
+- **Module 2**
+  - `m2-stdio`: Stdio transport MCP server with tools, resources, and prompts
+  - `m2-token-counting`: The Anthropic token counting demo shown in the course
 
 ## Errata
 
