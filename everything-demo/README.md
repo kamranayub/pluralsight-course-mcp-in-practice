@@ -198,6 +198,8 @@ The resource group name is stored in the `Azure:ResourceGroup` secret.
 
 Under Resource Groups, add a **Filter** for the tag `aspire` with a value of `true`.
 
+![Azure Resource Groups: Filter by aspire: true](../.github/docs-azure-aspire-deletion.png)
+
 Once you find the resource group, delete it.
 
 > [!IMPORTANT]
