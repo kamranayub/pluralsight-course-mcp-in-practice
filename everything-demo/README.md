@@ -2,6 +2,45 @@
 
 This is the full course demo project. It uses [Aspire](https://aspire.dev), a cross-platform Infrastructure-as-Code (IaC) local development environment.
 
+<!-- TOC depthfrom:2 -->
+
+- [Prerequisites](#prerequisites)
+- [Get Started](#get-started)
+- [Using the MCP Inspector](#using-the-mcp-inspector)
+- [Connecting to the MCP Server](#connecting-to-the-mcp-server)
+    - [Visual Studio Code default](#visual-studio-code-default)
+    - [Claude Desktop optional](#claude-desktop-optional)
+    - [ChatGPT web only](#chatgpt-web-only)
+- [Azure Provisioning optional](#azure-provisioning-optional)
+    - [Configure Azure Integration for Aspire](#configure-azure-integration-for-aspire)
+    - [Indexing the PDF Documents](#indexing-the-pdf-documents)
+    - [Deleting and Cleaning Up Resources](#deleting-and-cleaning-up-resources)
+    - [Troubleshooting](#troubleshooting)
+        - [The access token is from the wrong issuer](#the-access-token-is-from-the-wrong-issuer)
+        - [Authentication failed against tenant](#authentication-failed-against-tenant)
+        - [hrm-search-service: Operation would exceed 'free' tier service quota.](#hrm-search-service-operation-would-exceed-free-tier-service-quota)
+- [Protect the MCP Server with Entra ID optional](#protect-the-mcp-server-with-entra-id-optional)
+    - [Enabling Authentication](#enabling-authentication)
+    - [HRM API Entra App Registration](#hrm-api-entra-app-registration)
+    - [MCP Server Entra App Registration](#mcp-server-entra-app-registration)
+- [Infrastructure](#infrastructure)
+    - [Prerequisite: Entra Tenant Configuration](#prerequisite-entra-tenant-configuration)
+        - [Configuring App Delegation / Impersonation](#configuring-app-delegation--impersonation)
+    - [Provision HRM API](#provision-hrm-api)
+        - [Upload PDF Documents](#upload-pdf-documents)
+        - [Azure AI Search Configuration](#azure-ai-search-configuration)
+    - [Provision MCP Server](#provision-mcp-server)
+- [HRM API](#hrm-api)
+    - [Overview](#overview)
+    - [Authentication & identity](#authentication--identity)
+    - [Data & persistence](#data--persistence)
+    - [Notes](#notes)
+- [MCP Server](#mcp-server)
+- [Azure Blob Storage](#azure-blob-storage)
+- [Azure AI Search](#azure-ai-search)
+
+<!-- /TOC -->
+
 ## Prerequisites
 
 - Follow the [Aspire](https://aspire.dev/get-started/prerequisites/) prerequisites guide

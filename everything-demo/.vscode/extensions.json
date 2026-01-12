@@ -4,6 +4,7 @@
     "ms-dotnettools.csharp",
     "Trottero.dotnetwatchattach",
     "microsoft-aspire.aspire-vscode",
-    "ms-dotnettools.csdevkit"
+    "ms-dotnettools.csdevkit",
+    "huntertran.auto-markdown-toc"
   ]
 }
