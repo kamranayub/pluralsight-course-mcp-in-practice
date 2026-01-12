@@ -167,11 +167,11 @@ When provided an Azure subscription ID and an Entra tenant ID, Aspire will provi
 
 ### Indexing the PDF Documents
 
-The first time you run the Aspire project with Azure provisioning, an AI search index is created but the PDF documents are not actually _indexed_ yet.
-
-If you try to run the `ask_about_policy` tool, you will not see any document excerpt until you index the PDF documents in the vector database.
+The first time you run the Aspire project with Azure provisioning, an AI search index is created but the PDF documents will not actually be _indexed_ yet. If you try to run the `ask_about_policy` tool, you will not see any document excerpt until you index the PDF documents in the vector database.
 
 To index the PDFs, in the Aspire dashboard, click the **Run Search Indexer** command button next to the `hrm-search-service` to index the documents.
+
+![Aspire Dashboard: Run search indexer command](../.github/docs-aspire-indexer.png)
 
 It will take a few seconds before the indexing operation runs. You can view the logs using the Console Logs screen in the Dashboard, or
 view the Search Indexer in the Azure portal for details.
@@ -334,7 +334,7 @@ from the browser, you will also need to configure Redirect URIs.
 
 # Deploying the Project
 
-> [!DANGER]
+> [!CUATION]
 > This is not fully implemented. It requires custom Azure Bicep configuration that is not yet
 > migrated to Aspire, but can be found in the `master` branch.
 
@@ -343,9 +343,6 @@ from the browser, you will also need to configure Redirect URIs.
 ```sh
 aspire deploy
 ```
-
-> [!WARNING]
-> This will deploy Premium-level production resources and App Service plans to your Azure subscription.
 
 ## Infrastructure
 
