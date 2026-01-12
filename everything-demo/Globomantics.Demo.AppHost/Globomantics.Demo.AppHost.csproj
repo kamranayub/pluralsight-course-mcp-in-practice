@@ -1,5 +1,13 @@
 ﻿<Project Sdk="Aspire.AppHost.Sdk/13.1.0">
 
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>44640097-33da-43a5-bd11-908901a6fa5a</UserSecretsId>
+  </PropertyGroup>
+  
   <ItemGroup>
     <ProjectReference Include="..\Globomantics.Hrm.Api\Globomantics.Hrm.Api.csproj" />
     <ProjectReference Include="..\Globomantics.Mcp.Server\Globomantics.Mcp.Server.csproj" />
@@ -14,12 +22,5 @@
     <PackageReference Include="CommunityToolkit.Aspire.Hosting.McpInspector" Version="13.0.1-beta.468" />
   </ItemGroup>
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <UserSecretsId>44640097-33da-43a5-bd11-908901a6fa5a</UserSecretsId>
-  </PropertyGroup>
 
 </Project>

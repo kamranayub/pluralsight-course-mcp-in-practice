@@ -179,6 +179,62 @@ view the Search Indexer in the Azure portal for details.
 > [!NOTE]
 > This operation will cost a few cents as it issues requests to the embedding model deployment to index the documents.
 
+### Deleting and Cleaning Up Resources
+
+Aspire does not automatically teardown your provisioned Azure resources. While every effort has been made to use the Free SKUs for each resource,
+there may still be costs associated with keeping the resources provisioned.
+
+To delete the resources Aspire provisions, find the resource group name:
+
+**Using the .NET User Secrets Tool**
+
+```sh
+dotnet user-secrets list --project Globomantics.Demo.AppHost/Globomantics.Demo.AppHost.csproj
+```
+
+The resource group name is stored in the `Azure:ResourceGroup` secret.
+
+**Using the Azure Portal**
+
+Under Resource Groups, add a **Filter** for the tag `aspire` with a value of `true`.
+
+Once you find the resource group, delete it.
+
+> [!IMPORTANT]
+> The Azure AI Foundry resource will only be _soft-deleted._ Azure keeps it around for a few days before purging it.
+
+If you want to purge it right away, in the Azure Portal navigate to the AI Foundry resources overview and in the quick action toolbar, select "Manage Deleted Resources":
+
+![Azure Foundry: Manage Deleted Resources](../.github/docs-azure-foundry-deletion.png)
+
+Select the Foundry resource, and click "Purge." This will have to be done before `aspire run` will provision a Foundry resource again!
+
+> [!CAUTION]
+> If you delete the Azure resource group, `aspire run` will not re-provision resources automatically but they will still appear "Healthy." You will need to **clear the user secrets** of all Azure deployment-related keys in order to re-provision Azure resources during `aspire run`.
+
+.NET user secrets are [stored in different locations](https://learn.microsoft.com/en-us/aspnet/core/security/app-secrets?view=aspnetcore-10.0&tabs=windows#how-the-secret-manager-tool-works) depending on your platform in a `secrets.json` file which you can edit and clear.
+
+On Windows:
+
+    %APPDATA%\Microsoft\UserSecrets\44640097-33da-43a5-bd11-908901a6fa5a\secrets.json
+
+On Linux/MacOS:
+
+    ~/.microsoft/usersecrets/44640097-33da-43a5-bd11-908901a6fa5a/secrets.json
+
+The user secrets ID is in the `Globomantics.Demo.AppHost\Globomantics.Demo.AppHost.csproj` under the `UserSecretsId` property.
+
+> [!TIP]
+> If you are using Visual Studio Code with the C# DevKit extension, right-click the `Globomantics.Demo.AppHost\Globomantics.Demo.AppHost.csproj` file in the file explorer and click **Manage User Secrets** which will open the JSON file in the editor directly.
+
+Delete the following keys:
+
+- `Azure:Deployment:*` -- These store metadata about the provisioned resources
+- `Azure:ResourceGroup` -- This is the provisioned resource group name
+
+> [!NOTE]
+> You could also use `dotnet user-secrets clear` command but this will clear ALL secrets, including the Azure subcription secrets. You will need to re-add the secrets if you do this.
+
 ### Troubleshooting
 
 #### The access token is from the wrong issuer
