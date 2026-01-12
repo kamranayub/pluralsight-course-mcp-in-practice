@@ -152,22 +152,6 @@ dotnet user-secrets set "Azure:SubscriptionId" "your-subscription-id" --project 
 dotnet user-secrets set "Azure:Location" "eastus" --project ./Globomantics.Demo.AppHost
 ```
 
-You will also need an Entra tenant ID, which can be the default tenant:
-
-```sh
-az account show --query tenantId
-```
-
-This will output your tenant ID quoted in a string, like `"<tenant_id>"`. Copy the tenant ID (without quotes) and set another user secret:
-
-```sh
-dotnet user-secrets set "Parameters:azureTenantId" "your-tenant-id" --project ./Globomantics.Demo.AppHost
-```
-
-> [!TIP]
-> If you don't provide the `azureTenantId` parameter, Aspire will prompt you to add it in the Dashboard before
-> any of the dependent resources will be started.
-
 Now run Aspire:
 
 ```sh
@@ -180,9 +164,48 @@ When provided an Azure subscription ID and an Entra tenant ID, Aspire will provi
 - `hrm-foundry` - Azure AI Foundry
 - `hrm-embeddings` - Foundry-deployed OpenAI model for text-embedding-ada-002
 
-## Enabling Authentication (optional)
+## Protect the MCP Server with Entra ID (optional)
 
+The course features a protected MCP server via OAuth using Microsoft Entra ID as the Authorization Server (AS), also called an Identity Provider (IdP).
+In the past, Entra ID was named Azure AD, which is why you may see the abbreviation "AAD" in code and configuration.
 
+Every Azure subscription comes with a default Entra ID "tenant". A tenant is an Active Directory tenant, basically just a way to logically group and separate
+identities -- such as organizations, school vs. work vs. personal, etc. You can choose to use your default tenant for protecting the MCP server,
+or you can create a new one to keep the demo separate.
+
+At a high-level, you will need to set up your Entra tenant to allow for two APIs: the HRM backend and the MCP server itself, and you will need to configure them
+so the MCP server can delegate on-behalf-of the calling user to the HRM API.
+
+> [!IMPORTANT]
+> This is the most advanced mode you can operate in and requires manual steps to configure Microsoft Entra.
+> This mode also requires you to follow the [Azure Provisioning](#azure-provisioning-optional) steps beforehand.
+
+At the end of this process, you will have several identifiers to add as parameters in Aspire:
+
+- `hrmApiAadClientId` -- This is the Entra "Client ID" (or Application ID) which identifies the HRM backend app registration
+- `hrmApiAadClientSecret` -- This is the Entra "Client Secret" which is used to sign and secure cookies for the Azure App Service "Easy Auth" configuration
+- `mcpServerAadClientId` -- This is the Entra "Client ID" (or Application ID) which identifies the MCP server app registration
+- `mcpServerAadClientSecret` -- This is the Entra "Client Secret" which is used to exchange tokens on-behalf-of the the calling user through OAuth delegation
+
+### Enabling Authentication
+
+In the `appsettings.Development.json` file, you can set `enableMcpAuth: true` to enable the OAuth-protected MCP server.
+
+Before you can proceed, you will need to configure two Microsoft Entra app registrations.
+
+### HRM API Entra App Registration
+
+The HRM API backend is deployed using Azure Functions and is protected by Microsoft Entra ID. The MCP server
+calls this downstream API on-behalf-of the user. 
+
+To support this, the app registration requires a client secret credential to be created, as well as a 
+delegated API permission scope.
+
+### MCP Server Entra App Registration
+
+The MCP server will also be protected by Entra ID, via the OAuth support in the MCP C# SDK. This requires
+another separate app registration with a client secret credential. Since some clients will connect via OAuth flows
+from the browser, you will also need to configure Redirect URIs.
 
 # Deploying the Project
 
