@@ -160,6 +160,9 @@ if (hasAzureSubscriptionSet) {
                                 .OfType<SearchService>()
                                 .Single();
 
+            // Keep it affordable for demo purposes
+            searchService.SearchSkuName = SearchServiceSkuName.Free;
+
             searchService.Identity = new ManagedServiceIdentity()
             {
                 ManagedServiceIdentityType = ManagedServiceIdentityType.SystemAssigned
