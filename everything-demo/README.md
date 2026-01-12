@@ -239,7 +239,11 @@ Under Resource Groups, add a **Filter** for the tag `aspire` with a value of `tr
 
 ![Azure Resource Groups: Filter by aspire: true](../.github/docs-azure-aspire-deletion.png)
 
-Once you find the resource group, delete it.
+Once you find the resource group, delete it using the Azure CLI (or Azure Portal):
+
+```sh
+az group delete --name <RESOURCE_GROUP_NAME> --yes --no-wait
+```
 
 > [!IMPORTANT]
 > The Azure AI Foundry resource will only be _soft-deleted._ Azure keeps it around for a few days before purging it.
@@ -353,7 +357,7 @@ At the end of this process, you will have several identifiers to add as paramete
 
 ### Enabling Authentication
 
-In the `appsettings.Development.json` file, you can set `enableMcpAuth: true` to enable the OAuth-protected MCP server.
+In the `appsettings.json` file, you can set `EnableMcpAuth: true` to enable the OAuth-protected MCP server.
 
 Before you can proceed, you will need to configure two Microsoft Entra app registrations.
 
@@ -373,7 +377,7 @@ from the browser, you will also need to configure Redirect URIs.
 
 # Deploying the Project
 
-> [!CUATION]
+> [!CAUTION]
 > This is not fully implemented. It requires custom Azure Bicep configuration that is not yet
 > migrated to Aspire, but can be found in the `master` branch.
 
@@ -382,6 +386,51 @@ from the browser, you will also need to configure Redirect URIs.
 ```sh
 aspire deploy
 ```
+
+Aspire will begin the deployment and ask you to select your Azure tenant:
+
+```sh
+(fetch-tenant) → Starting fetch-tenant...
+(fetch-tenant) → Fetching available tenants
+(fetch-tenant) ✓ Fetching available tenants (2.4s)
+(fetch-tenant) ✓ Found 1 available tenant(s)
+Select your Azure tenant:                                             
+```
+
+Select the Tenant ID you want to deploy to (this should match the expected Entra ID tenant you will authenticate with).
+
+Next, Aspire will ask you to select your Azure subscription:
+
+```sh
+(fetch-subscription) → Starting fetch-subscription...
+(fetch-subscription) → Fetching available subscriptions
+(fetch-subscription) ✓ Fetching available subscriptions (1.4s)
+(fetch-subscription) ✓ Found 1 available subscription(s)
+Select your Azure subscription: 
+```
+
+Select the Azure subscription you've been using or a new one to deploy live resources to.
+
+Next, Aspire will ask you to select a resource group or enter a new name:
+
+```sh
+(fetch-resource-groups) → Starting fetch-resource-groups...
+(fetch-resource-groups) → Fetching resource groups
+(fetch-resource-groups) ✓ Fetching resource groups (1.6s)
+(fetch-resource-groups) ✓ Found 35 resource group(s)
+Select your Azure resource group or enter a new name:
+```
+
+Scroll down using the arrow keys to select an existing group, or scroll all the way to the bottom and select **Other** to create a new one.
+
+Press 'Enter' to select the default generated resource group name or enter your own custom name.
+
+Next, Aspire will ask you to select a region.
+
+> [!IMPORTANT]
+> You must select a region where Azure AI Search and Foundry can deploy models. `eastus` is the default region the demo assumes.
+
+Once you select a region, Aspire will begin the deployment and this can take a few minutes to complete.
 
 ## Infrastructure
 

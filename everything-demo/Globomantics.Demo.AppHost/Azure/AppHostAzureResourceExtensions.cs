@@ -20,79 +20,56 @@ public static class AppHostAzureResourceExtensions
 {
     public static IDistributedApplicationBuilder AddAzureMcpDemoResources(
         this IDistributedApplicationBuilder builder,
+        bool enableMcpAuth,
         TokenCredential azureCredential,
         IResourceBuilder<AzureFunctionsProjectResource> mcp,
         IResourceBuilder<AzureFunctionsProjectResource> hrmApi,
         IResourceBuilder<AzureStorageResource> hrmDocumentStorage,
         IResourceBuilder<AzureBlobStorageContainerResource> hrmDocumentBlobs)
     {
-        var hrmApiAadClientId = builder.AddParameter("hrmApiAadClientId", value: "", secret: true)
-            .WithDescription("The Entra (Azure AD) Client ID for the HRM API application.");
+        if (enableMcpAuth)
+        {
+            var hrmApiAadClientId = builder.AddParameter("hrmApiAadClientId", value: "", secret: true)
+                .WithDescription("The Entra (Azure AD) Client ID for the HRM API application.");
 
-        var hrmApiAadClientSecret = builder.AddParameter("hrmApiAadClientSecret", value: "", secret: true)
-            .WithDescription("The Entra (Azure AD) Client Secret for the HRM API application.");
+            var hrmApiAadClientSecret = builder.AddParameter("hrmApiAadClientSecret", value: "", secret: true)
+                .WithDescription("The Entra (Azure AD) Client Secret for the HRM API application.");
 
-        var mcpServerAadClientId = builder.AddParameter("mcpServerAadClientId", value: "", secret: true)
-            .WithDescription("The Entra (Azure AD) Client ID for the MCP Server application.");
+            var mcpServerAadClientId = builder.AddParameter("mcpServerAadClientId", value: "", secret: true)
+                .WithDescription("The Entra (Azure AD) Client ID for the MCP Server application.");
 
-        var mcpServerAadClientSecret = builder.AddParameter("mcpServerAadClientSecret", value: "", secret: true)
-            .WithDescription("The Entra (Azure AD) Client Secret for the MCP Server application.");
+            var mcpServerAadClientSecret = builder.AddParameter("mcpServerAadClientSecret", value: "", secret: true)
+                .WithDescription("The Entra (Azure AD) Client Secret for the MCP Server application.");
 
-        var appServicePlan = builder.AddAzureAppServiceEnvironment("ps-globomantics-aspire-ase")
-            .ConfigureInfrastructure(infra =>
-            {
-                var resources = infra.GetProvisionableResources();
-                var plan = resources.OfType<AppServicePlan>().Single();
+            mcp
+                .WithEnvironment("HRM_API_AAD_CLIENT_ID", hrmApiAadClientId)
+                .WithEnvironment("MCP_SERVER_AAD_CLIENT_ID", mcpServerAadClientId)
+                .WithEnvironment("MCP_SERVER_AAD_CLIENT_SECRET", mcpServerAadClientSecret);
+        }
 
-                // In order to use the Aspire deployment support for Azure Functions,
-                // you would need a Premium SKU capable of Linux containers.
-                // However, we need custom auth anyway, so we will use Bicep files to
-                // deploy the Function App into a Flex Consumption plan.
-                plan.Sku = new AppServiceSkuDescription
-                {
-                    Name = "FC1",
-                    Tier = "FlexConsumption"
-                };
-            });
-
-        var hrmUserAssignedIdentity = builder.AddAzureUserAssignedIdentity("hrm-umi");
-        var hrmAppInsights = builder.AddAzureApplicationInsights("hrm-app-insights");
+        var acaEnv = builder.AddAzureContainerAppEnvironment("aca-env");
 
         if (builder.ExecutionContext.IsPublishMode) {
-            var hrmApiBicep = builder.AddBicepTemplate("hrm-api-bicep", "infra/hrm-api.bicep")            
-                .WithParameter("applicationInsightsName", hrmAppInsights.GetOutput("name"))
-                .WithParameter("appServicePlanId", appServicePlan.GetOutput("planId"))
-                .WithParameter("serviceName", hrmApi.Resource.Name)
-                .WithParameter("identityId", hrmUserAssignedIdentity.GetOutput("id"))
-                .WithParameter("identityClientId", hrmUserAssignedIdentity.GetOutput("clientId"))
-                .WithParameter("runtimeName", "dotnet-isolated")
-                .WithParameter("runtimeVersion", "8.0")
-                .WithParameter("instanceMemoryMB", 512)
-                .WithParameter("maximumInstanceCount", 100)
-                .WithParameter("location", builder.Configuration["Azure:Location"]!)
-                .WithParameter("storageAccountName", () =>
-                {
-                    var storage = builder.Resources
-                        .OfType<AzureStorageResource>()
-                        .Single(r => r.Name.StartsWith("funcstorage"));
+            // var hrmApiBicep = builder.AddBicepTemplate("hrm-api-bicep", "infra/hrm-api.bicep")            
+            //     .WithParameter("applicationInsightsName", hrmAppInsights.GetOutput("name"))
+            //     .WithParameter("appServicePlanId", appServicePlan.GetOutput("planId"))
+            //     .WithParameter("serviceName", hrmApi.Resource.Name)
+            //     .WithParameter("identityId", hrmUserAssignedIdentity.GetOutput("id"))
+            //     .WithParameter("identityClientId", hrmUserAssignedIdentity.GetOutput("clientId"))
+            //     .WithParameter("runtimeName", "dotnet-isolated")
+            //     .WithParameter("runtimeVersion", "8.0")
+            //     .WithParameter("instanceMemoryMB", 512)
+            //     .WithParameter("maximumInstanceCount", 100)
+            //     .WithParameter("location", builder.Configuration["Azure:Location"]!)
+            //     .WithParameter("storageAccountName", hrmDocumentStorage.Resource.Name)
+            //     .WithParameter("deploymentStorageContainerName", $"app-package-{hrmDocumentStorage.Resource.Name}")
+            //     .WithParameter("clientId", hrmApiAadClientId)
+            //     .WithParameter("mcpClientId", mcpServerAadClientId);
 
-                    return storage.Name;
-                })
-                .WithParameter("deploymentStorageContainerName",  () =>
-                {
-                    var storage = builder.Resources
-                        .OfType<AzureStorageResource>()
-                        .Single(r => r.Name.StartsWith("funcstorage"));
-
-                    return $"app-package-{storage.Name}";
-                })
-                .WithParameter("clientId", hrmApiAadClientId)
-                .WithParameter("mcpClientId", mcpServerAadClientId);
-
-            hrmApi
-                .WithEnvironment("HRM_API_AAD_CLIENT_ID", hrmApiAadClientId)
-                .WithEnvironment("AZURE_CLIENT_ID", hrmUserAssignedIdentity.GetOutput("clientId"))
-                .WithEnvironment("MICROSOFT_PROVIDER_AUTHENTICATION_SECRET", hrmApiAadClientSecret);
+            // hrmApi
+            //     .WithEnvironment("HRM_API_AAD_CLIENT_ID", hrmApiAadClientId)
+            //     .WithEnvironment("AZURE_CLIENT_ID", hrmUserAssignedIdentity.GetOutput("clientId"))
+            //     .WithEnvironment("MICROSOFT_PROVIDER_AUTHENTICATION_SECRET", hrmApiAadClientSecret);
         }
         
         var aiSearch = builder.AddAzureSearch("hrm-search-service")
@@ -171,9 +148,6 @@ public static class AppHostAzureResourceExtensions
 
         mcp
             .WithEnvironment("HRM_SEARCH_SERVICE_INDEX_NAME", $"{aiSearch.Resource.Name}-index")
-            .WithEnvironment("HRM_API_AAD_CLIENT_ID", hrmApiAadClientId)
-            .WithEnvironment("MCP_SERVER_AAD_CLIENT_ID", mcpServerAadClientId)
-            .WithEnvironment("MCP_SERVER_AAD_CLIENT_SECRET", mcpServerAadClientSecret)
             .WithReference(aiSearch)
             .WaitFor(aiSearch)
             .WaitFor(foundry)

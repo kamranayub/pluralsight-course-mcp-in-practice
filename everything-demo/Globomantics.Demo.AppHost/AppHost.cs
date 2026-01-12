@@ -14,14 +14,7 @@ var azureCredential = new DefaultAzureCredential();
 var builder = DistributedApplication.CreateBuilder(args);
 
 var hasAzureSubscriptionSet = !string.IsNullOrWhiteSpace(builder.Configuration.GetValue<string>("Azure:SubscriptionId"));
-
-var enableMcpAuth = builder.AddParameter("enableMcpAuth", value: "false", publishValueAsDefault: true)
-    .WithDescription("Whether or not to protect the MCP server with Entra ID. Requires additional Entra ID app registration configuration.");
-
-var api = builder.AddAzureFunctionsProject<Globomantics_Hrm_Api>("hrm-api")
-    .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.ExecutionContext.IsPublishMode ? "Production" : "Development")
-    .WithEnvironment("API_ENABLE_AUTH", enableMcpAuth)
-    .WithExternalHttpEndpoints();
+var enableMcpAuth = builder.Configuration.GetValue("EnableMcpAuth", false);
 
 var hrmDocumentStorage = builder.AddAzureStorage("hrm-documents-storage")
     .ConfigureInfrastructure(infra =>
@@ -35,6 +28,18 @@ var hrmDocumentStorage = builder.AddAzureStorage("hrm-documents-storage")
             Value = storageAccount.Id
         });
     });
+
+var api = builder.AddAzureFunctionsProject<Globomantics_Hrm_Api>("hrm-api")
+    .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.ExecutionContext.IsPublishMode ? "Production" : "Development")
+    .WithEnvironment("API_ENABLE_AUTH", enableMcpAuth.ToString())
+    .WithHostStorage(hrmDocumentStorage)
+    .WithRoleAssignments(hrmDocumentStorage, 
+        StorageBuiltInRole.StorageAccountContributor,
+        StorageBuiltInRole.StorageBlobDataContributor,
+        StorageBuiltInRole.StorageTableDataContributor,
+        StorageBuiltInRole.StorageQueueDataContributor)
+    .WithExternalHttpEndpoints();
+
 
 var hrmDocumentBlobs = hrmDocumentStorage
     .AddBlobContainer("hrm-blob-service", blobContainerName: "globomanticshrdocs")
@@ -71,8 +76,14 @@ var hrmDocumentBlobs = hrmDocumentStorage
 
 var mcp = builder.AddAzureFunctionsProject<Globomantics_Mcp_Server>("mcp")
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.ExecutionContext.IsPublishMode ? "Production" : "Development")
-    .WithEnvironment("MCP_ENABLE_AUTH", enableMcpAuth)
+    .WithEnvironment("MCP_ENABLE_AUTH", enableMcpAuth.ToString())
     .WithExternalHttpEndpoints()
+    .WithHostStorage(hrmDocumentStorage)
+    .WithRoleAssignments(hrmDocumentStorage, 
+        StorageBuiltInRole.StorageAccountContributor,
+        StorageBuiltInRole.StorageBlobDataContributor,
+        StorageBuiltInRole.StorageTableDataContributor,
+        StorageBuiltInRole.StorageQueueDataContributor)
     .WithReference(hrmDocumentBlobs)
     .WithReference(api)
     .WaitFor(api)
@@ -93,9 +104,7 @@ var mcp = builder.AddAzureFunctionsProject<Globomantics_Mcp_Server>("mcp")
                 cancellationToken: cancellationToken);
         }
 
-        var authEnabled = await enableMcpAuth.Resource.GetValueAsync(cancellationToken);
-
-        if (bool.TryParse(authEnabled, out var enabled) && !enabled) {
+        if (!enableMcpAuth) {
             
             _ = interactionService.PromptNotificationAsync(
                 title: "Warning",
@@ -111,6 +120,7 @@ var mcp = builder.AddAzureFunctionsProject<Globomantics_Mcp_Server>("mcp")
 
 if (hasAzureSubscriptionSet) {
     builder.AddAzureMcpDemoResources(
+        enableMcpAuth,
         azureCredential,
         mcp, 
         api,
@@ -127,19 +137,23 @@ var mcpEndpoint = mcp.GetEndpoint("http");
 mcp.WithEnvironment("WEBSITE_HOSTNAME", ReferenceExpression.Create(
     $"{mcpEndpoint.Property(EndpointProperty.Host)}:{mcpEndpoint.Property(EndpointProperty.Port)}"));
 
-var mcpPatcher = builder
-    .AddResource(new JavaScriptAppResource("mcp-inspector-entra-patch", "npx", ""))
-    .WithNpm(install: true)
-    .WithCommand("npm")
-    .WithArgs("run", "patch:mcp");
+// TODO: The MCP Inspector throws an error during publish due to missing container app context
+if (builder.ExecutionContext.IsRunMode) {
+    var mcpPatcher = builder
+        .AddResource(new JavaScriptAppResource("mcp-inspector-entra-patch", "npx", ""))
+        .WithNpm(install: true)
+        .WithCommand("npm")
+        .WithArgs("run", "patch:mcp");
 
-var mcpInspector = builder.AddMcpInspector("mcp-inspector", options =>
-{
-    options.InspectorVersion = "0.18.0";
-})
-    .WithMcpServer(mcp, path: "/")
-    .WaitForCompletion(mcpPatcher);
+    var mcpInspector = builder.AddMcpInspector("mcp-inspector", options =>
+    {
+        options.InspectorVersion = "0.18.0";
+    })
+        .WithMcpServer(mcp, path: "/")
+        .WaitForCompletion(mcpPatcher)
+        .PublishAsAzureContainerApp((_, _) => {});
 
-mcp.WithReference(mcpInspector);
+    mcp.WithReference(mcpInspector);
+}
 
 builder.Build().Run();
