@@ -357,7 +357,22 @@ At the end of this process, you will have several identifiers to add as paramete
 
 ### Enabling Authentication
 
-In the `appsettings.json` file, you can set `EnableMcpAuth: true` to enable the OAuth-protected MCP server.
+First, in the `appsettings.json` file, you can set `EnableMcpAuth: true` to enable the OAuth-protected MCP server.
+
+Then, find your Azure tenant ID:
+
+```sh
+az account show --query tenantId
+```
+
+> [!NOTE]
+> This is your Entra tenant "issuer" that will issue and sign the authentication tokens.
+
+Add a new user secret (or provide it in the Aspire dashboard):
+
+```sh
+dotnet user-secrets set "Parameters:azureTenantId" "your-tenant-id" --project ./Globomantics.Demo.AppHost
+```
 
 Before you can proceed, you will need to configure two Microsoft Entra app registrations.
 

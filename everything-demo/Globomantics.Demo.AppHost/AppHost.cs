@@ -76,7 +76,7 @@ var hrmDocumentBlobs = hrmDocumentStorage
 
 var mcp = builder.AddAzureFunctionsProject<Globomantics_Mcp_Server>("mcp")
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.ExecutionContext.IsPublishMode ? "Production" : "Development")
-    .WithEnvironment("MCP_ENABLE_AUTH", enableMcpAuth.ToString())
+    .WithEnvironment("MCP_ENABLE_AUTH", enableMcpAuth.ToString())    
     .WithExternalHttpEndpoints()
     .WithHostStorage(hrmDocumentStorage)
     .WithRoleAssignments(hrmDocumentStorage, 
