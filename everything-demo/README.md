@@ -150,6 +150,7 @@ Then, add the following Azure subscription secrets:
 ```sh
 dotnet user-secrets set "Azure:SubscriptionId" "your-subscription-id" --project ./Globomantics.Demo.AppHost
 dotnet user-secrets set "Azure:Location" "eastus" --project ./Globomantics.Demo.AppHost
+dotnet user-secrets set "Azure:CredentialSource" "AzureCli" --project ./Globomantics.Demo.AppHost
 ```
 
 Now run Aspire:
@@ -163,6 +164,72 @@ When provided an Azure subscription ID and an Entra tenant ID, Aspire will provi
 - `hrm-search-service` - Azure AI Search Service
 - `hrm-foundry` - Azure AI Foundry
 - `hrm-embeddings` - Foundry-deployed OpenAI model for text-embedding-ada-002
+
+### Indexing the PDF Documents
+
+The first time you run the Aspire project with Azure provisioning, an AI search index is created but the PDF documents are not actually _indexed_ yet.
+
+If you try to run the `ask_about_policy` tool, you will not see any document excerpt until you index the PDF documents in the vector database.
+
+To index the PDFs, in the Aspire dashboard, click the **Run Search Indexer** command button next to the `hrm-search-service` to index the documents.
+
+It will take a few seconds before the indexing operation runs. You can view the logs using the Console Logs screen in the Dashboard, or
+view the Search Indexer in the Azure portal for details.
+
+> [!NOTE]
+> This operation will cost a few cents as it issues requests to the embedding model deployment to index the documents.
+
+### Troubleshooting
+
+#### The access token is from the wrong issuer
+
+If you receive an error during provisioning like this:
+
+> The access token is from the wrong issuer 'https://sts.windows.net/actual_tenant_id/'. It must match the tenant 'https://sts.windows.net/expected_tenant_id/' associated with this subscription. Please use the authority (URL) 'https://login.windows.net/expected_tenant_id' to get the token. Note, if the subscription is transferred to another tenant there is no impact to the services, but information about new tenant could take time to propagate (up to an hour). If you just transferred your subscription and see this error message, please try back later.
+
+This likely means the Azure Credential Source is not coming from the `az` CLI but somewhere else such as Visual Studio.
+
+Make sure to set the `Azure:CredentialSource` to `AzureCli` (shown above) to explicitly select the Azure CLI as the credential source for `aspire run`.
+
+#### Authentication failed against tenant
+
+During `az login` if you receive the following error:
+
+> Authentication failed against tenant TENANT_ID 'YOUR NAME': SubError: basic_action V2Error: invalid_grant AADSTS50076: Due to a configuration change made by your administrator, or because you moved to a new location, you must use multi-factor authentication to access 'SUBCRIPTION'. If you need to access subscriptions in the following tenants, please use `az login --tenant TENANT_ID`.
+
+You will need to the following the instructions to run `az login` with your specific Entra Tenant ID:
+
+```sh
+az login --tenant TENANT_ID
+```
+
+The tenant ID is printed out at the beginning of the error message. This error may be due to having multiple tenants or multiple subscriptions with different auth configurations.
+
+#### hrm-search-service: Operation would exceed 'free' tier service quota.
+
+The `hrm-search-service` resource may fail to provision with this error:
+
+> Operation would exceed 'free' tier service quota. You are using 1 out of 1 'free' tier service quota.
+
+This means you already have a Free tier AI Search Service in your Azure Subscription. You will need to remove it before trying to provision, or you will need to modify the `Sku`
+to be `Standard` in the Aspire configuration, located in `Globomantics.Demo.AppHost\Azure\AppHostAzureResourceExtensions.cs`:
+
+```diff
+var aiSearch = builder.AddAzureSearch("hrm-search-service")
+            .WithRunIndexerCommand(azureCredential)
+            .ConfigureInfrastructure(infra =>
+            {
+                var searchService = infra.GetProvisionableResources()
+                                    .OfType<SearchService>()
+                                    .Single();
+
+                // Keep it affordable for demo purposes
+-                searchService.SearchSkuName = SearchServiceSkuName.Free;
++                searchService.SearchSkuName = SearchServiceSkuName.Standard;
+```
+
+> [!CAUTION]
+> Be advised the Standard SKU for AI Search Service is around $75/mo.
 
 ## Protect the MCP Server with Entra ID (optional)
 

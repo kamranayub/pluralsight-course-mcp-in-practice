@@ -15,12 +15,8 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 var hasAzureSubscriptionSet = !string.IsNullOrWhiteSpace(builder.Configuration.GetValue<string>("Azure:SubscriptionId"));
 
-var azureTenantId = builder.AddParameter("azureTenantId", value: "", secret: true)
-    .WithDescription("The Entra (Azure AD) Tenant ID that serves as the identity provider. For development, this can be the default tenant associated with your Azure account. Use `az account show --query tenantId` to discover the tenant ID.", enableMarkdown: true);
-
 var enableMcpAuth = builder.AddParameter("enableMcpAuth", value: "false", publishValueAsDefault: true)
     .WithDescription("Whether or not to protect the MCP server with Entra ID. Requires additional Entra ID app registration configuration.");
-
 
 var api = builder.AddAzureFunctionsProject<Globomantics_Hrm_Api>("hrm-api")
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.ExecutionContext.IsPublishMode ? "Production" : "Development")
@@ -28,7 +24,6 @@ var api = builder.AddAzureFunctionsProject<Globomantics_Hrm_Api>("hrm-api")
     .WithExternalHttpEndpoints();
 
 var hrmDocumentStorage = builder.AddAzureStorage("hrm-documents-storage")
-    .RunAsEmulator()
     .ConfigureInfrastructure(infra =>
     {
         var storageAccount = infra.GetProvisionableResources()
@@ -76,12 +71,12 @@ var hrmDocumentBlobs = hrmDocumentStorage
 
 var mcp = builder.AddAzureFunctionsProject<Globomantics_Mcp_Server>("mcp")
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.ExecutionContext.IsPublishMode ? "Production" : "Development")
-    .WithEnvironment("AZURE_TENANT_ID", azureTenantId)
     .WithEnvironment("MCP_ENABLE_AUTH", enableMcpAuth)
     .WithExternalHttpEndpoints()
     .WithReference(hrmDocumentBlobs)
     .WithReference(api)
     .WaitFor(api)
+    .WaitFor(hrmDocumentStorage)
     .WaitFor(hrmDocumentBlobs)
     .OnResourceReady(async (resource, e, cancellationToken) =>
     {
@@ -116,12 +111,15 @@ var mcp = builder.AddAzureFunctionsProject<Globomantics_Mcp_Server>("mcp")
 
 if (hasAzureSubscriptionSet) {
     builder.AddAzureMcpDemoResources(
-        azureCredential, 
-        azureTenantId,
+        azureCredential,
         mcp, 
         api,
         hrmDocumentStorage, 
         hrmDocumentBlobs);
+} 
+else
+{
+    hrmDocumentStorage.RunAsEmulator();
 }
 
 var mcpEndpoint = mcp.GetEndpoint("http");

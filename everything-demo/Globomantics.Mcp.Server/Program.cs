@@ -114,7 +114,7 @@ var mcpBuilder = builder.Services.AddMcpServer()
     .WithToolsFromAssembly()
     .WithPromptsFromAssembly();
 
-if (!enableMcpAuth) {
+if (builder.Configuration["HRM_SEARCH_SERVICE_URI"] is null) {
     mcpBuilder.AddListToolsFilter(next => async (context, cancellationToken) =>
     {
         var logger = context.Services?.GetService<ILogger<Program>>();
@@ -123,7 +123,7 @@ if (!enableMcpAuth) {
         var toolsThatAreOpenWorld = result.Tools.Where(tool => tool.Annotations?.OpenWorldHint == true);
         result.Tools = result.Tools.Except(toolsThatAreOpenWorld).ToList();
         
-        logger?.LogInformation("Filtered out open world tools due to missing delegation auth: {ToolNames}", 
+        logger?.LogInformation("Filtered out open world tools due to missing AI search: {ToolNames}", 
             string.Join(", ", toolsThatAreOpenWorld.Select(t => t.Name)));
 
         return result;

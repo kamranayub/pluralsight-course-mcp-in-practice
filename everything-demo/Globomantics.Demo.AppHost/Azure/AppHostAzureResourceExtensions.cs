@@ -1,3 +1,4 @@
+using System.Numerics;
 using Aspire.Hosting.Azure;
 using Azure.Core;
 using Azure.Provisioning;
@@ -20,7 +21,6 @@ public static class AppHostAzureResourceExtensions
     public static IDistributedApplicationBuilder AddAzureMcpDemoResources(
         this IDistributedApplicationBuilder builder,
         TokenCredential azureCredential,
-        IResourceBuilder<ParameterResource> azureTenantId,
         IResourceBuilder<AzureFunctionsProjectResource> mcp,
         IResourceBuilder<AzureFunctionsProjectResource> hrmApi,
         IResourceBuilder<AzureStorageResource> hrmDocumentStorage,
@@ -58,50 +58,42 @@ public static class AppHostAzureResourceExtensions
         var hrmUserAssignedIdentity = builder.AddAzureUserAssignedIdentity("hrm-umi");
         var hrmAppInsights = builder.AddAzureApplicationInsights("hrm-app-insights");
 
-        var hrmApiBicep = builder.AddBicepTemplate("hrm-api-bicep", "infra/hrm-api.bicep")            
-            .WithParameter("applicationInsightsName", hrmAppInsights.GetOutput("name"))
-            .WithParameter("appServicePlanId", appServicePlan.GetOutput("planId"))
-            .WithParameter("serviceName", hrmApi.Resource.Name)
-            .WithParameter("identityId", hrmUserAssignedIdentity.GetOutput("id"))
-            .WithParameter("identityClientId", hrmUserAssignedIdentity.GetOutput("clientId"))
-            .WithParameter("runtimeName", "dotnet-isolated")
-            .WithParameter("runtimeVersion", "8.0")
-            .WithParameter("instanceMemoryMB", 512)
-            .WithParameter("maximumInstanceCount", 100)
-            .WithParameter("location", builder.Configuration["Azure:Location"]!)
-            .WithParameter("storageAccountName", () =>
-            {
-                 var storage = builder.Resources
-                    .OfType<AzureStorageResource>()
-                    .Single(r => r.Name.StartsWith("funcstorage"));
+        if (builder.ExecutionContext.IsPublishMode) {
+            var hrmApiBicep = builder.AddBicepTemplate("hrm-api-bicep", "infra/hrm-api.bicep")            
+                .WithParameter("applicationInsightsName", hrmAppInsights.GetOutput("name"))
+                .WithParameter("appServicePlanId", appServicePlan.GetOutput("planId"))
+                .WithParameter("serviceName", hrmApi.Resource.Name)
+                .WithParameter("identityId", hrmUserAssignedIdentity.GetOutput("id"))
+                .WithParameter("identityClientId", hrmUserAssignedIdentity.GetOutput("clientId"))
+                .WithParameter("runtimeName", "dotnet-isolated")
+                .WithParameter("runtimeVersion", "8.0")
+                .WithParameter("instanceMemoryMB", 512)
+                .WithParameter("maximumInstanceCount", 100)
+                .WithParameter("location", builder.Configuration["Azure:Location"]!)
+                .WithParameter("storageAccountName", () =>
+                {
+                    var storage = builder.Resources
+                        .OfType<AzureStorageResource>()
+                        .Single(r => r.Name.StartsWith("funcstorage"));
 
-                return storage.Name;
-            })
-            .WithParameter("deploymentStorageContainerName",  () =>
-            {
-                 var storage = builder.Resources
-                    .OfType<AzureStorageResource>()
-                    .Single(r => r.Name.StartsWith("funcstorage"));
+                    return storage.Name;
+                })
+                .WithParameter("deploymentStorageContainerName",  () =>
+                {
+                    var storage = builder.Resources
+                        .OfType<AzureStorageResource>()
+                        .Single(r => r.Name.StartsWith("funcstorage"));
 
-                return $"app-package-{storage.Name}";
-            })
-            .WithParameter("clientId", hrmApiAadClientId)
-            .WithParameter("issuerUrl", ReferenceExpression.Create($"https://login.microsoftonline.com/{azureTenantId}/v2.0"))
-            .WithParameter("clientApps", [
-                ReferenceExpression.Create($"{hrmApiAadClientId}").ValueExpression, 
-                ReferenceExpression.Create($"{mcpServerAadClientId}").ValueExpression
-                ])
-            .WithParameter("tokenAudiences", [
-                ReferenceExpression.Create($"{hrmApiAadClientId}").ValueExpression,
-                ReferenceExpression.Create($"api://{hrmApiAadClientId}").ValueExpression,
-                ReferenceExpression.Create($"api://{hrmApiAadClientId}/user_impersonation").ValueExpression
-            ]);
+                    return $"app-package-{storage.Name}";
+                })
+                .WithParameter("clientId", hrmApiAadClientId)
+                .WithParameter("mcpClientId", mcpServerAadClientId);
 
-        hrmApi
-            .WithEnvironment("HRM_API_AAD_CLIENT_ID", hrmApiAadClientId)
-            .WithEnvironment("AZURE_CLIENT_ID", hrmUserAssignedIdentity.GetOutput("clientId"))
-            .WithEnvironment("MICROSOFT_PROVIDER_AUTHENTICATION_SECRET", hrmApiAadClientSecret);
-        
+            hrmApi
+                .WithEnvironment("HRM_API_AAD_CLIENT_ID", hrmApiAadClientId)
+                .WithEnvironment("AZURE_CLIENT_ID", hrmUserAssignedIdentity.GetOutput("clientId"))
+                .WithEnvironment("MICROSOFT_PROVIDER_AUTHENTICATION_SECRET", hrmApiAadClientSecret);
+        }
         
         var aiSearch = builder.AddAzureSearch("hrm-search-service")
             .WithRunIndexerCommand(azureCredential)
@@ -186,59 +178,59 @@ public static class AppHostAzureResourceExtensions
             .WaitFor(aiSearch)
             .WaitFor(foundry)
             .OnBeforeResourceStarted(async (resource, e, cancellationToken) =>
-        {
-            var logger = e.Services.GetRequiredService<ResourceLoggerService>().GetLogger(resource);
-            var config = e.Services.GetRequiredService<IConfiguration>();
+            {
+                var logger = e.Services.GetRequiredService<ResourceLoggerService>().GetLogger(resource);
+                var config = e.Services.GetRequiredService<IConfiguration>();
 
-            logger.LogInformation("Provisioning AI Search configuration for HRM data...");
+                logger.LogInformation("Provisioning AI Search configuration for HRM data...");
 
-            var searchEndpoint = await aiSearch.Resource.GetConnectionProperty("Uri").GetValueAsync(cancellationToken);
-            var foundryEndpoint = await foundry.Resource.GetConnectionProperty("Uri").GetValueAsync(cancellationToken);
-            var hrmDocumentBlobEndpoint = await hrmDocumentBlobs.Resource.GetConnectionProperty("Uri").GetValueAsync(cancellationToken);
+                var searchEndpoint = await aiSearch.Resource.GetConnectionProperty("Uri").GetValueAsync(cancellationToken);
+                var foundryEndpoint = await foundry.Resource.GetConnectionProperty("Uri").GetValueAsync(cancellationToken);
+                var hrmDocumentBlobEndpoint = await hrmDocumentBlobs.Resource.GetConnectionProperty("Uri").GetValueAsync(cancellationToken);
 
-            logger.LogDebug("Discovered AI Search endpoint: {Endpoint}", searchEndpoint);
-            logger.LogDebug("Discovered AI Foundry endpoint: {Endpoint}", foundryEndpoint);
-            logger.LogDebug("Discovered HRM Document Blob endpoint: {Endpoint}", hrmDocumentBlobEndpoint);
+                logger.LogDebug("Discovered AI Search endpoint: {Endpoint}", searchEndpoint);
+                logger.LogDebug("Discovered AI Foundry endpoint: {Endpoint}", foundryEndpoint);
+                logger.LogDebug("Discovered HRM Document Blob endpoint: {Endpoint}", hrmDocumentBlobEndpoint);
 
-            var foundryUri = new Uri(foundryEndpoint!);
-            var foundryResourceName = foundryUri.Host.Split('.').First();
-            var storageAccountName = new Uri(hrmDocumentBlobEndpoint!).Host.Split('.').First();
-            var blobContainerName = await hrmDocumentBlobs.Resource.GetConnectionProperty("BlobContainerName").GetValueAsync(cancellationToken);
+                var foundryUri = new Uri(foundryEndpoint!);
+                var foundryResourceName = foundryUri.Host.Split('.').First();
+                var storageAccountName = new Uri(hrmDocumentBlobEndpoint!).Host.Split('.').First();
+                var blobContainerName = await hrmDocumentBlobs.Resource.GetConnectionProperty("BlobContainerName").GetValueAsync(cancellationToken);
 
-            logger.LogDebug("Discovered HRM Document Blob Container Name: {BlobContainer}", blobContainerName);
+                logger.LogDebug("Discovered HRM Document Blob Container Name: {BlobContainer}", blobContainerName);
 
-            var indexClient = new SearchIndexClient(new Uri(searchEndpoint!), azureCredential);
-            var indexerClient = new SearchIndexerClient(new Uri(searchEndpoint!), azureCredential);
-            var storageAccountResourceId = await hrmDocumentStorage.GetOutput("StorageAccountResourceId").GetValueAsync(cancellationToken);
-            var connectionString = $"ResourceId={storageAccountResourceId};";
+                var indexClient = new SearchIndexClient(new Uri(searchEndpoint!), azureCredential);
+                var indexerClient = new SearchIndexerClient(new Uri(searchEndpoint!), azureCredential);
+                var storageAccountResourceId = await hrmDocumentStorage.GetOutput("StorageAccountResourceId").GetValueAsync(cancellationToken);
+                var connectionString = $"ResourceId={storageAccountResourceId};";
 
-            logger.LogDebug("Using Blob managed identity connection string: {ConnectionString}", connectionString);
+                logger.LogDebug("Using Blob managed identity connection string: {ConnectionString}", connectionString);
 
-            var dataSourceName = $"{aiSearch.Resource.Name}-datasource";
-            var skillsetName =$"{aiSearch.Resource.Name}-skillset";
-            var indexName = $"{aiSearch.Resource.Name}-index";
+                var dataSourceName = $"{aiSearch.Resource.Name}-datasource";
+                var skillsetName =$"{aiSearch.Resource.Name}-skillset";
+                var indexName = $"{aiSearch.Resource.Name}-index";
 
-            var dataSource = await HrmSearchSteps.CreateOrUpdateSearchDataSource(logger, indexerClient, dataSourceName, blobContainerName!, connectionString);
+                var dataSource = await HrmSearchSteps.CreateOrUpdateSearchDataSource(logger, indexerClient, dataSourceName, blobContainerName!, connectionString);
 
-            var skills = new List<SearchIndexerSkill>() {
-                HrmSearchSteps.CreateSplitSkill(),
-                HrmSearchSteps.CreateEmbeddingSkill(
-                    deploymentId: embedding.Resource.DeploymentName,
-                    modelName: embedding.Resource.ModelName,
+                var skills = new List<SearchIndexerSkill>() {
+                    HrmSearchSteps.CreateSplitSkill(),
+                    HrmSearchSteps.CreateEmbeddingSkill(
+                        deploymentId: embedding.Resource.DeploymentName,
+                        modelName: embedding.Resource.ModelName,
+                        embeddingResourceUri: foundryUri
+                    )
+                };
+                
+                var index = await HrmSearchSteps.CreateOrUpdateSearchIndex(
+                    logger, indexClient, indexName,
+                    embeddingDeploymentName: embedding.Resource.DeploymentName,
+                    embeddingModelName: embedding.Resource.ModelName,
                     embeddingResourceUri: foundryUri
-                )
-            };
-            
-            var index = await HrmSearchSteps.CreateOrUpdateSearchIndex(
-                logger, indexClient, indexName,
-                embeddingDeploymentName: embedding.Resource.DeploymentName,
-                embeddingModelName: embedding.Resource.ModelName,
-                embeddingResourceUri: foundryUri
-            );
-            var skillset = await HrmSearchSteps.CreateOrUpdateSearchSkillSet(logger, indexerClient, skillsetName, skills, indexName);
+                );
+                var skillset = await HrmSearchSteps.CreateOrUpdateSearchSkillSet(logger, indexerClient, skillsetName, skills, indexName);
 
-            logger.LogInformation("Successfully provisioned AI Search index, vectorizer, skillset, and data source for HRM data.");
-        });
+                logger.LogInformation("Successfully provisioned AI Search index, vectorizer, skillset, and data source for HRM data.");
+            });
 
         return builder;
     }

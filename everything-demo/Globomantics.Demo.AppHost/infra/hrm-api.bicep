@@ -18,20 +18,19 @@ param identityClientId string = ''
 @description('The client ID of the HRM API Azure AD application for authentication')
 param clientId string
 
-@description('The issuer URL for the Azure AD')
-param issuerUrl string
-
-@description('The allowed token audiences for the Function App')
-param tokenAudiences array = []
-
-@description('The allowed AAD client application IDs for the Function App')
-param clientApps array = []
+@description('The client ID of the MCP Server Azure AD application for authentication')
+param mcpClientId string
 
 @allowed(['SystemAssigned', 'UserAssigned'])
 param identityType string = 'UserAssigned'
 
 var applicationInsightsIdentity = 'ClientId=${identityClientId};Authorization=AAD'
 var kind = 'functionapp,linux'
+var issuerUrl = 'https://login.microsoftonline.com/${tenant().tenantId}/v2.0'
+var tokenAudiences array = [clientId, 'api://${clientId}', 'api://${clientId}/user_impersonation']
+
+@description('The allowed AAD client application IDs for the Function App')
+var clientApps array = [clientId, mcpClientId]
 
 resource stg 'Microsoft.Storage/storageAccounts@2022-09-01' existing = {
   name: storageAccountName
