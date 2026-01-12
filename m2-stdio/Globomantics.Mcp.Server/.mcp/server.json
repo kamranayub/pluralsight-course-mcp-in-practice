@@ -1,0 +1,56 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
+  "description": "A sample MCP server for the Pluralsight course on MCP in Practice",
+  "name": "io.github.kamranayub/pluralsight-course-mcp-in-practice",
+  "version": "0.1.0-beta",
+  "packages": [
+    {
+      "registryType": "nuget",
+      "identifier": "Pluralsight.Globomantics.Mcp.DemoServer",
+      "version": "0.1.0-beta",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [],
+      "environmentVariables": [
+        {
+            "name": "AZURE_TENANT_ID",
+            "type": "userPrompt",
+            "description": "The Azure tenant ID to use for authentication",
+            "placeholder": "e.g. 12345678-1234-1234-1234-123456789012",
+            "isRequired": true
+        },
+        {
+            "name": "HRM_API_AAD_CLIENT_ID",
+            "type": "userPrompt",
+            "description": "The AAD client ID for the HRM API",
+            "isRequired": true
+        },
+        {
+            "name": "HRM_API_ENDPOINT",
+            "type": "userPrompt",
+            "description": "The base URL for the HRM API",
+            "placeholder": "https://your-hrm-api.azurewebsites.net",
+            "isRequired": true
+        },
+        {
+            "name": "MCP_SERVER_AAD_CLIENT_ID",
+            "type": "userPrompt",
+            "description": "The AAD client ID for the MCP server",
+            "isRequired": true
+        },
+        {
+            "name": "MCP_SERVER_AAD_CLIENT_SECRET",
+            "type": "userPrompt",
+            "description": "The AAD client secret for the MCP server",
+            "isRequired": true,
+            "isSecret": true
+        }
+      ]
+    }
+  ],
+  "repository": {
+    "url": "https://github.com/kamranayub/pluralsight-course-mcp-in-practice",
+    "source": "github"
+  }
+}
