@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "inspect": "npx @modelcontextprotocol/inspector",
     "patch:mcp": "patch-package"
   },
   "keywords": [],

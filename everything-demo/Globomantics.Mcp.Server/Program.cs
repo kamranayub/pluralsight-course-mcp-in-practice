@@ -214,7 +214,7 @@ static void ConfigureHrmServices(IHostApplicationBuilder builder, bool enableDel
             var tenantId = builder.Configuration["AZURE_TENANT_ID"];
             var mcpClientId = builder.Configuration["MCP_SERVER_AAD_CLIENT_ID"];
             var mcpClientSecret = builder.Configuration["MCP_SERVER_AAD_CLIENT_SECRET"];
-            var hrmEndpoint = builder.Configuration["HRM_API_HTTP"];
+            var hrmEndpoint = builder.Configuration["HRM_API_HTTPS"] ?? builder.Configuration["HRM_API_HTTP"];
             var hrmAppId = builder.Configuration["HRM_API_AAD_CLIENT_ID"];
 
             return RestClient.For<IHrmAbsenceApi>(hrmEndpoint, async (request, cancellationToken) =>

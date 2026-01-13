@@ -515,7 +515,24 @@ Once you select a region, Aspire will begin the deployment and this can take a f
 
 ### Testing with MCP Inspector
 
-When using `aspire deploy`, the MCP Inspector will _not_ be provisioned or running as part of your Aspire deployment.
+When using `aspire deploy`, the MCP Inspector will _not_ be provisioned or started as part of your Aspire deployment.
+
+You can start the Inspector manually by running `npm run inspect` in the AppHost directory:
+
+```sh
+cd Globomantics.Demo.AppHost
+npm run inspect
+```
+
+The URL will likely reflect any previous `localhost:5000` URL you've been testing if running locally.
+
+The `aspire deploy` command will print out the ingress URL for your MCP server deployment, like this:
+
+```sh
+mcp-containerapp deployed to https://<APP_NAME>.<ENVIRONMENT>.<LOCATION>.azurecontainerapps.io
+```
+
+That is the URL you'll need to set in the MCP Inspector.
 
 ### Troubleshooting
 

@@ -53,12 +53,6 @@ public static class AppHostMcpDemoExtensions
             .WithEnvironment("WEBSITE_AUTH_AAD_ALLOWED_TENANTS", azureTenantId)
             .WithEnvironment("MICROSOFT_PROVIDER_AUTHENTICATION_SECRET", hrmApiAadClientSecret);
 
-
-        // var hrmApiAuthBicep = builder.AddBicepTemplate("hrm-api-bicep", "infra/hrm-api-auth.bicep")
-        //     .WithParameter("name", hrmApi.Resource.Name)
-        //     .WithParameter("clientId", hrmApiAadClientId)
-        //     .WithParameter("mcpClientId", mcpServerAadClientId);
-
         // See: https://learn.microsoft.com/en-us/azure/container-apps/authentication-entra
         // See: https://learn.microsoft.com/en-us/azure/container-apps/authentication#secure-endpoints-with-easyauth
         builder.Pipeline.AddStep("update-hrm-api-microsoft-auth", async (context) =>
@@ -79,46 +73,13 @@ public static class AppHostMcpDemoExtensions
             {
                 try
                 {
-                    var updateMicrosoftAuthProcess = Process.Start(CreateAzStartInfo(
-                        "containerapp", "auth", "microsoft", "update",
-                        "--name", hrmApi.Resource.Name,
-                        "--resource-group", resourceGroupName,
-                        "--client-id", clientId!,
-                        "--client-secret-name", "microsoft-provider-authentication-secret", // Matches the environment variable set earlier but as a container app secret
-                        "--tenant-id", tenantId!,
-                        "--allowed-audiences", allowedAudiences,
-                        "--yes"
-                    ));
-
-                    if (updateMicrosoftAuthProcess == null)
-                    {
-                        await configureAuthTask.CompleteAsync(
-                            "Failed to start az CLI process",
-                            CompletionState.CompletedWithWarning,
-                            context.CancellationToken).ConfigureAwait(false);
-                        return;
-                    }
-
-                    var stdoutTask = updateMicrosoftAuthProcess.StandardOutput.ReadToEndAsync();
-                    var stderrTask = updateMicrosoftAuthProcess.StandardError.ReadToEndAsync();
-
-                    await updateMicrosoftAuthProcess.WaitForExitAsync(context.CancellationToken).ConfigureAwait(false);
-
-                    var stdout = await stdoutTask.ConfigureAwait(false);
-                    var stderr = await stderrTask.ConfigureAwait(false);
-
-                    if (updateMicrosoftAuthProcess.ExitCode != 0)
-                    {
-                        await configureAuthTask.CompleteAsync(
-                            $"az CLI process exited with code {updateMicrosoftAuthProcess.ExitCode}\nSTDOUT: {stdout}\nSTDERR: {stderr}",
-                            CompletionState.CompletedWithError,
-                            context.CancellationToken).ConfigureAwait(false);
-
-                        return;
-                    }
+                    await EnableContainerAppCorsPolicyForMcpInspector(mcp.Resource.Name, resourceGroupName, configureAuthTask, context.CancellationToken).ConfigureAwait(false);
+                    await ConfigureContainerAppAuthWithMicrosoft(hrmApi.Resource.Name, resourceGroupName, tenantId!, clientId!, allowedAudiences, configureAuthTask, context.CancellationToken).ConfigureAwait(false);
+                    var containerAppEndpoint = await GetContainerAppEndpoint(hrmApi.Resource.Name, resourceGroupName, clientId!, configureAuthTask, context.CancellationToken).ConfigureAwait(false) ?? throw new InvalidOperationException("Failed to retrieve container app endpoint");
+                    await ConfigureContainerAppAuthRedirectUri(containerAppEndpoint, clientId!, configureAuthTask, context.CancellationToken).ConfigureAwait(false);
 
                     await configureAuthTask.CompleteAsync(
-                        $"Successfully configured Microsoft Entra authentication for hrm-api ACA resource.\nSTDOUT: {stdout}",
+                        $"Successfully configured Microsoft Entra authentication for hrm-api ACA resource.",
                         CompletionState.Completed,
                         context.CancellationToken).ConfigureAwait(false);
                 }
@@ -126,14 +87,170 @@ public static class AppHostMcpDemoExtensions
                 {
                     await configureAuthTask.CompleteAsync(
                         $"Error configuring Microsoft Entra authentication: {ex.Message}",
-                        CompletionState.CompletedWithWarning,
+                        CompletionState.CompletedWithError,
                         context.CancellationToken).ConfigureAwait(false);
                 }
             }
-        }, requiredBy: WellKnownPipelineSteps.Deploy, dependsOn: "provision-hrm-api-containerapp");
+        }/*, requiredBy: WellKnownPipelineSteps.Deploy, dependsOn: "provision-hrm-api-containerapp"*/);
 
 
         return builder;
+    }
+
+    private static async Task EnableContainerAppCorsPolicyForMcpInspector(string containerAppName, string resourceGroupName, IReportingTask configureAuthTask, CancellationToken ct)
+    {
+        var enableCorsProcess = Process.Start(CreateAzStartInfo(
+            "containerapp", "ingress", "cors", "enable",
+            "--name", containerAppName,
+            "--resource-group", resourceGroupName,
+            "--allowed-origins", "http://localhost:6274"
+        ));
+
+        if (enableCorsProcess == null)
+        {
+            await configureAuthTask.CompleteAsync(
+                "Failed to start az CLI process",
+                CompletionState.CompletedWithError,
+                ct).ConfigureAwait(false);
+            return;
+        }
+
+        var stdoutTask = enableCorsProcess.StandardOutput.ReadToEndAsync(ct);
+        var stderrTask = enableCorsProcess.StandardError.ReadToEndAsync(ct);
+
+        await enableCorsProcess.WaitForExitAsync(ct).ConfigureAwait(false);
+
+        var stdout = await stdoutTask.ConfigureAwait(false);
+        var stderr = await stderrTask.ConfigureAwait(false);
+
+        if (enableCorsProcess.ExitCode != 0)
+        {
+            await configureAuthTask.CompleteAsync(
+                $"az CLI process exited with code {enableCorsProcess.ExitCode}\nSTDOUT: {stdout}\nSTDERR: {stderr}",
+                CompletionState.CompletedWithError,
+                ct).ConfigureAwait(false);
+
+            return;
+        }
+    }
+
+    private static async Task ConfigureContainerAppAuthWithMicrosoft(string containerAppName, string resourceGroupName, string tenantId, string clientId, string allowedAudiences, IReportingTask configureAuthTask, CancellationToken ct)
+    {
+        var updateMicrosoftAuthProcess = Process.Start(CreateAzStartInfo(
+            "containerapp", "auth", "microsoft", "update",
+            "--name", containerAppName,
+            "--resource-group", resourceGroupName,
+            "--client-id", clientId!,
+            "--client-secret-name", "microsoft-provider-authentication-secret", // Matches the environment variable set earlier but as a container app secret
+            "--tenant-id", tenantId!,
+            "--allowed-audiences", allowedAudiences,
+            "--yes"
+        ));
+
+        if (updateMicrosoftAuthProcess == null)
+        {
+            await configureAuthTask.CompleteAsync(
+                "Failed to start az CLI process",
+                CompletionState.CompletedWithError,
+                ct).ConfigureAwait(false);
+            return;
+        }
+
+        var stdoutTask = updateMicrosoftAuthProcess.StandardOutput.ReadToEndAsync(ct);
+        var stderrTask = updateMicrosoftAuthProcess.StandardError.ReadToEndAsync(ct);
+
+        await updateMicrosoftAuthProcess.WaitForExitAsync(ct).ConfigureAwait(false);
+
+        var stdout = await stdoutTask.ConfigureAwait(false);
+        var stderr = await stderrTask.ConfigureAwait(false);
+
+        if (updateMicrosoftAuthProcess.ExitCode != 0)
+        {
+            await configureAuthTask.CompleteAsync(
+                $"az CLI process exited with code {updateMicrosoftAuthProcess.ExitCode}\nSTDOUT: {stdout}\nSTDERR: {stderr}",
+                CompletionState.CompletedWithError,
+                ct).ConfigureAwait(false);
+
+            return;
+        }
+    }
+
+    private static async Task<Uri?> GetContainerAppEndpoint(string containerAppName, string resourceGroupName, string clientId, IReportingTask configureAuthTask, CancellationToken ct)
+    {
+        var getContainerAppFqdnProcess = Process.Start(CreateAzStartInfo(
+            "containerapp", "show",
+            "--name", containerAppName,
+            "--resource-group", resourceGroupName,
+            "--query", "properties.configuration.ingress.fqdn",
+            "--output", "tsv"
+        ));
+
+        if (getContainerAppFqdnProcess == null)
+        {
+            await configureAuthTask.CompleteAsync(
+                "Failed to start az CLI process",
+                CompletionState.CompletedWithError,
+                ct).ConfigureAwait(false);
+
+            return null;
+        }
+
+        var stdoutTask = getContainerAppFqdnProcess.StandardOutput.ReadToEndAsync(ct);
+        var stderrTask = getContainerAppFqdnProcess.StandardError.ReadToEndAsync(ct);
+
+        await getContainerAppFqdnProcess.WaitForExitAsync(ct).ConfigureAwait(false);
+
+        var stdout = await stdoutTask.ConfigureAwait(false);
+        var stderr = await stderrTask.ConfigureAwait(false);
+
+        if (getContainerAppFqdnProcess.ExitCode != 0)
+        {
+            await configureAuthTask.CompleteAsync(
+                $"az CLI process exited with code {getContainerAppFqdnProcess.ExitCode}\nSTDOUT: {stdout}\nSTDERR: {stderr}",
+                CompletionState.CompletedWithError,
+                ct).ConfigureAwait(false);
+
+            return null;
+        }
+
+        var fqdn = stdout.Trim();
+        return new Uri($"https://{fqdn}");
+    }
+
+    private static async Task ConfigureContainerAppAuthRedirectUri(Uri containerEndpoint, string clientId, IReportingTask configureAuthTask, CancellationToken ct)
+    {
+        var updateEntraAppRedirectUris = Process.Start(CreateAzStartInfo(
+            "ad", "app", "update",
+            "--id", clientId,
+            "--web-redirect-uris", new Uri(containerEndpoint, ".auth/login/aad/callback").ToString()
+        ));
+
+        if (updateEntraAppRedirectUris == null)
+        {
+            await configureAuthTask.CompleteAsync(
+                "Failed to start az CLI process",
+                CompletionState.CompletedWithWarning,
+                ct).ConfigureAwait(false);
+            return;
+        }
+
+        var stdoutTask = updateEntraAppRedirectUris.StandardOutput.ReadToEndAsync(ct);
+        var stderrTask = updateEntraAppRedirectUris.StandardError.ReadToEndAsync(ct);
+
+        await updateEntraAppRedirectUris.WaitForExitAsync(ct).ConfigureAwait(false);
+
+        var stdout = await stdoutTask.ConfigureAwait(false);
+        var stderr = await stderrTask.ConfigureAwait(false);
+
+        if (updateEntraAppRedirectUris.ExitCode != 0)
+        {
+            await configureAuthTask.CompleteAsync(
+                $"az CLI process exited with code {updateEntraAppRedirectUris.ExitCode}\nSTDOUT: {stdout}\nSTDERR: {stderr}",
+                CompletionState.CompletedWithError,
+                ct).ConfigureAwait(false);
+
+            return;
+        }
     }
 
     public static IDistributedApplicationBuilder AddAzureMcpDemoResources(
