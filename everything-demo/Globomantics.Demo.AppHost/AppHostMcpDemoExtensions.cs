@@ -63,7 +63,7 @@ public static class AppHostMcpDemoExtensions
 
             var tenantId = await azureTenantId.Resource.GetValueAsync(context.CancellationToken);
             var clientId = await hrmApiAadClientId.Resource.GetValueAsync(context.CancellationToken);
-            var allowedAudiences = string.Join(", ", [clientId, $"api://{clientId}", $"api://{clientId}/user_impersonation"]);
+            string[] allowedAudiences = [$"{clientId}", $"api://{clientId}", $"api://{clientId}/user_impersonation"];
 
             var configureAuthTask = await context.ReportingStep
                     .CreateTaskAsync($"Configuring Microsoft Entra authentication for hrm-api ACA resource", context.CancellationToken)
@@ -91,7 +91,7 @@ public static class AppHostMcpDemoExtensions
                         context.CancellationToken).ConfigureAwait(false);
                 }
             }
-        }/*, requiredBy: WellKnownPipelineSteps.Deploy, dependsOn: "provision-hrm-api-containerapp"*/);
+        }, requiredBy: WellKnownPipelineSteps.Deploy, dependsOn: new string[] {"provision-mcp-containerapp", "provision-hrm-api-containerapp"});
 
 
         return builder;
@@ -134,7 +134,7 @@ public static class AppHostMcpDemoExtensions
         }
     }
 
-    private static async Task ConfigureContainerAppAuthWithMicrosoft(string containerAppName, string resourceGroupName, string tenantId, string clientId, string allowedAudiences, IReportingTask configureAuthTask, CancellationToken ct)
+    private static async Task ConfigureContainerAppAuthWithMicrosoft(string containerAppName, string resourceGroupName, string tenantId, string clientId, string[] allowedAudiences, IReportingTask configureAuthTask, CancellationToken ct)
     {
         var updateMicrosoftAuthProcess = Process.Start(CreateAzStartInfo(
             "containerapp", "auth", "microsoft", "update",
@@ -143,7 +143,7 @@ public static class AppHostMcpDemoExtensions
             "--client-id", clientId!,
             "--client-secret-name", "microsoft-provider-authentication-secret", // Matches the environment variable set earlier but as a container app secret
             "--tenant-id", tenantId!,
-            "--allowed-audiences", allowedAudiences,
+            "--allowed-audiences", string.Join(",", allowedAudiences),
             "--yes"
         ));
 
