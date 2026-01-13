@@ -118,9 +118,14 @@ var mcp = builder.AddAzureFunctionsProject<Globomantics_Mcp_Server>("mcp")
         }
     });
 
-if (hasAzureSubscriptionSet) {
+if (enableMcpAuth)
+{
+    builder.AddAuthMcpDemoResources(mcp, api);
+}
+
+if (hasAzureSubscriptionSet) 
+{
     builder.AddAzureMcpDemoResources(
-        enableMcpAuth,
         azureCredential,
         mcp, 
         api,
@@ -137,7 +142,7 @@ var mcpEndpoint = mcp.GetEndpoint("http");
 mcp.WithEnvironment("WEBSITE_HOSTNAME", ReferenceExpression.Create(
     $"{mcpEndpoint.Property(EndpointProperty.Host)}:{mcpEndpoint.Property(EndpointProperty.Port)}"));
 
-// TODO: The MCP Inspector throws an error during publish due to missing container app context
+// MCP Inspector only works in Run mode and is not meant to be published
 if (builder.ExecutionContext.IsRunMode) {
     var mcpPatcher = builder
         .AddResource(new JavaScriptAppResource("mcp-inspector-entra-patch", "npx", ""))
@@ -150,8 +155,7 @@ if (builder.ExecutionContext.IsRunMode) {
         options.InspectorVersion = "0.18.0";
     })
         .WithMcpServer(mcp, path: "/")
-        .WaitForCompletion(mcpPatcher)
-        .PublishAsAzureContainerApp((_, _) => {});
+        .WaitForCompletion(mcpPatcher);
 
     mcp.WithReference(mcpInspector);
 }

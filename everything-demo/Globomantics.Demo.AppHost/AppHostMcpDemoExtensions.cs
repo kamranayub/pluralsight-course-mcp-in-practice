@@ -12,60 +12,62 @@ using Azure.Search.Documents.Indexes;
 using Azure.Search.Documents.Indexes.Models;
 using Globomantics.Demo.AppHost.Roles;
 using Globomantics.Demo.AppHost.Search;
-using Google.Protobuf.WellKnownTypes;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-public static class AppHostAzureResourceExtensions
+public static class AppHostMcpDemoExtensions
 {
+    public static IDistributedApplicationBuilder AddAuthMcpDemoResources(
+        this IDistributedApplicationBuilder builder,
+        IResourceBuilder<AzureFunctionsProjectResource> mcp,
+        IResourceBuilder<AzureFunctionsProjectResource> hrmApi)
+    {
+        var azureTenantId = builder.AddParameter("azureTenantId", secret: true)
+            .WithDescription("The Entra (Azure AD) Tenant ID for the Azure resources. You can find this using the Azure CLI command: `az account show --query tenantId`", enableMarkdown: true);
+
+        var hrmApiAadClientId = builder.AddParameter("hrmApiAadClientId", secret: true)
+            .WithDescription("The Entra (Azure AD) Client ID for the HRM API application.");
+
+        var hrmApiAadClientSecret = builder.AddParameter("hrmApiAadClientSecret", secret: true)
+            .WithDescription("The Entra (Azure AD) Client Secret for the HRM API application.");
+
+        var mcpServerAadClientId = builder.AddParameter("mcpServerAadClientId", secret: true)
+            .WithDescription("The Entra (Azure AD) Client ID for the MCP Server application.");
+
+        var mcpServerAadClientSecret = builder.AddParameter("mcpServerAadClientSecret", secret: true)
+            .WithDescription("The Entra (Azure AD) Client Secret for the MCP Server application.");
+
+        mcp
+            .WithEnvironment("AZURE_TENANT_ID", azureTenantId)
+            .WithEnvironment("HRM_API_AAD_CLIENT_ID", hrmApiAadClientId)
+            .WithEnvironment("MCP_SERVER_AAD_CLIENT_ID", mcpServerAadClientId)
+            .WithEnvironment("MCP_SERVER_AAD_CLIENT_SECRET", mcpServerAadClientSecret);
+
+        hrmApi
+            .WithEnvironment("HRM_API_AAD_CLIENT_ID", hrmApiAadClientId)
+            .WithEnvironment("MICROSOFT_PROVIDER_AUTHENTICATION_SECRET", hrmApiAadClientSecret);
+
+        if (builder.ExecutionContext.IsPublishMode) 
+        {
+            builder.AddBicepTemplate("hrm-api-bicep", "infra/hrm-api-auth.bicep")            
+                .WithParameter("name", hrmApi.Resource.Name)
+                .WithParameter("clientId", hrmApiAadClientId)
+                .WithParameter("mcpClientId", mcpServerAadClientId);
+        }
+
+        return builder;
+    }
+
     public static IDistributedApplicationBuilder AddAzureMcpDemoResources(
         this IDistributedApplicationBuilder builder,
-        bool enableMcpAuth,
         TokenCredential azureCredential,
         IResourceBuilder<AzureFunctionsProjectResource> mcp,
         IResourceBuilder<AzureFunctionsProjectResource> hrmApi,
         IResourceBuilder<AzureStorageResource> hrmDocumentStorage,
         IResourceBuilder<AzureBlobStorageContainerResource> hrmDocumentBlobs)
     {
-        if (enableMcpAuth)
-        {
-            var azureTenantId = builder.AddParameter("azureTenantId", secret: true)
-                .WithDescription("The Entra (Azure AD) Tenant ID for the Azure resources. You can find this using the Azure CLI command: `az account show --query tenantId`", enableMarkdown: true);
-
-            var hrmApiAadClientId = builder.AddParameter("hrmApiAadClientId", secret: true)
-                .WithDescription("The Entra (Azure AD) Client ID for the HRM API application.");
-
-            var hrmApiAadClientSecret = builder.AddParameter("hrmApiAadClientSecret", secret: true)
-                .WithDescription("The Entra (Azure AD) Client Secret for the HRM API application.");
-
-            var mcpServerAadClientId = builder.AddParameter("mcpServerAadClientId", secret: true)
-                .WithDescription("The Entra (Azure AD) Client ID for the MCP Server application.");
-
-            var mcpServerAadClientSecret = builder.AddParameter("mcpServerAadClientSecret", secret: true)
-                .WithDescription("The Entra (Azure AD) Client Secret for the MCP Server application.");
-
-            mcp
-                .WithEnvironment("AZURE_TENANT_ID", azureTenantId)
-                .WithEnvironment("HRM_API_AAD_CLIENT_ID", hrmApiAadClientId)
-                .WithEnvironment("MCP_SERVER_AAD_CLIENT_ID", mcpServerAadClientId)
-                .WithEnvironment("MCP_SERVER_AAD_CLIENT_SECRET", mcpServerAadClientSecret);
-
-            hrmApi.WithEnvironment("HRM_API_AAD_CLIENT_ID", hrmApiAadClientId);
-
-            if (builder.ExecutionContext.IsPublishMode) 
-            {
-                var hrmApiBicep = builder.AddBicepTemplate("hrm-api-bicep", "infra/hrm-api-auth.bicep")            
-                    .WithParameter("name", hrmApi.Resource.Name)
-                    .WithParameter("clientId", hrmApiAadClientId)
-                    .WithParameter("mcpClientId", mcpServerAadClientId);
-
-                hrmApi                
-                    .WithEnvironment("MICROSOFT_PROVIDER_AUTHENTICATION_SECRET", hrmApiAadClientSecret);
-            }
-        }
-
         var acaEnv = builder.AddAzureContainerAppEnvironment("aca-env");
 
         var aiSearch = builder.AddAzureSearch("hrm-search-service")

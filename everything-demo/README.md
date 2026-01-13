@@ -25,6 +25,7 @@ This is the full course demo project. It uses [Aspire](https://aspire.dev), a cr
     - [MCP Server Entra App Registration](#mcp-server-entra-app-registration)
     - [Troubleshooting](#troubleshooting)
         - [The redirect URI specified in the request does not match](#the-redirect-uri-specified-in-the-request-does-not-match)
+- [Preparing for the Deployment](#preparing-for-the-deployment)
 - [Infrastructure](#infrastructure)
     - [Prerequisite: Entra Tenant Configuration](#prerequisite-entra-tenant-configuration)
         - [Configuring App Delegation / Impersonation](#configuring-app-delegation--impersonation)
@@ -406,11 +407,34 @@ Revisit the configuration steps above to ensure you've added the redirect URI un
 
 # Deploying the Project
 
-> [!CAUTION]
-> This is not fully implemented. It requires custom Azure Bicep configuration that is not yet
-> migrated to Aspire, but can be found in the `master` branch.
+The Aspire project supports deploying to Microsoft Azure in two modes:
 
-**Optionally,** you can deploy the MCP server and HRM API to Azure with Aspire:
+- **Anonymous:** In this mode, the MCP server is anonymous and publicly accessible but you don't need Entra ID set up.
+- **Protected:** In this mode, the MCP server is protected by Entra ID but requires additional configuration.
+
+The **Anonymous** mode is when `EnableMcpAuth: false` in the `appsettings.json` file. This mode is useful if you just want to play with
+the MCP server, but you should immediately clean it up after you're done or anonymous users could issue requests to the MCP server.
+
+The **Protected** mode is when `EnableMcpAuth: true` in the `appsettings.json` file. This mode is the most robust and showcases how
+you can protect a MCP server in production. However, it is also the **most complex** to set up. You must complete the prerequisite steps
+in the [Entra ID Setup](#enabling-authentication) section first before deploying in this mode. 
+
+> [!TIP]
+> Test Protected mode locally using `aspire run` before trying to use `aspire deploy`. If it works locally,
+> it has a higher chance of "just working" when deployed.
+
+## Preparing for the Deployment
+
+To prepare for a production deployment, you must [delete any existing resources in Azure](#deleting-and-cleaning-up-resources).
+
+> [!IMPORTANT]
+> If you have previously ran `aspire run` with an Azure subscription set, it will have provisioned an AI Search Service (`hrm-search-service`) in the
+> Free SKU tier. If you try to run `aspire deploy` _without_ deleting the existing resource, it will fail to provision because you can only have 1 Free Tier SKU
+> in your subscription.
+>
+> **TODO:** It may be possible to detect existing AI Foundry and AI Search service resources and reuse them for deployment.
+
+Once the existing resources have been cleaned up, run the Aspire deployment command:
 
 ```sh
 aspire deploy
