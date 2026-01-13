@@ -15,10 +15,12 @@ This is the full course demo project. It uses [Aspire](https://aspire.dev), a cr
     - [Configure Azure Integration for Aspire](#configure-azure-integration-for-aspire)
     - [Indexing the PDF Documents](#indexing-the-pdf-documents)
     - [Deleting and Cleaning Up Resources](#deleting-and-cleaning-up-resources)
+        - [Purging AI Foundry Resources](#purging-ai-foundry-resources)
     - [Troubleshooting](#troubleshooting)
         - [The access token is from the wrong issuer](#the-access-token-is-from-the-wrong-issuer)
         - [Authentication failed against tenant](#authentication-failed-against-tenant)
         - [hrm-search-service: Operation would exceed 'free' tier service quota.](#hrm-search-service-operation-would-exceed-free-tier-service-quota)
+        - [hrm-foundry: Deployment failed: FlagMustBeSetForRestore](#hrm-foundry-deployment-failed-flagmustbesetforrestore)
 - [Protect the MCP Server with Entra ID optional](#protect-the-mcp-server-with-entra-id-optional)
     - [Enabling Authentication](#enabling-authentication)
     - [HRM API Entra App Registration](#hrm-api-entra-app-registration)
@@ -26,6 +28,9 @@ This is the full course demo project. It uses [Aspire](https://aspire.dev), a cr
     - [Troubleshooting](#troubleshooting)
         - [The redirect URI specified in the request does not match](#the-redirect-uri-specified-in-the-request-does-not-match)
 - [Preparing for the Deployment](#preparing-for-the-deployment)
+    - [Testing with MCP Inspector](#testing-with-mcp-inspector)
+    - [Troubleshooting](#troubleshooting)
+        - [Deployment fails after deleting production resources](#deployment-fails-after-deleting-production-resources)
 - [Infrastructure](#infrastructure)
     - [Prerequisite: Entra Tenant Configuration](#prerequisite-entra-tenant-configuration)
         - [Configuring App Delegation / Impersonation](#configuring-app-delegation--impersonation)
@@ -248,6 +253,8 @@ Once you find the resource group, delete it using the Azure CLI (or Azure Portal
 az group delete --name <RESOURCE_GROUP_NAME> --yes --no-wait
 ```
 
+#### Purging AI Foundry Resources
+
 > [!IMPORTANT]
 > The Azure AI Foundry resource will only be _soft-deleted._ Azure keeps it around for a few days before purging it.
 
@@ -334,6 +341,16 @@ var aiSearch = builder.AddAzureSearch("hrm-search-service")
 
 > [!CAUTION]
 > Be advised the Standard SKU for AI Search Service is around $75/mo.
+
+#### hrm-foundry: Deployment failed: FlagMustBeSetForRestore
+
+When using `aspire run` or `aspire deploy` with an Azure subscription set, you may receive the following error:
+
+> Failed to provision hrm-foundry: Deployment failed: FlagMustBeSetForRestore: An existing resource with ID 'resourceId' has been soft-deleted. To restore the resource, 
+> you must specify 'restore' to be 'true' in the property. If you don't want to restore existing resource, please purge it first.
+
+This means you [deleted the AI Foundry resource](#deleting-and-cleaning-up-resources) but forgot to _purge_ it. Follow the steps in that section
+to ensure the AI Foundry resource is purged before re-running Aspire.
 
 ## Protect the MCP Server with Entra ID (optional)
 
@@ -440,6 +457,17 @@ Once the existing resources have been cleaned up, run the Aspire deployment comm
 aspire deploy
 ```
 
+**If you are deploying in Protected mode,** Aspire will ask you to provide the Entra secrets and configuration parameters:
+
+```sh
+❯ aspire deploy
+(pipeline-execution) → Starting pipeline-execution...
+(process-parameters) → Starting process-parameters...
+Please provide values for the unresolved parameters.
+```
+
+Enter the values you previously did when using authentication with `aspire run`.
+
 Aspire will begin the deployment and ask you to select your Azure tenant:
 
 ```sh
@@ -484,6 +512,26 @@ Next, Aspire will ask you to select a region.
 > You must select a region where Azure AI Search and Foundry can deploy models. `eastus` is the default region the demo assumes.
 
 Once you select a region, Aspire will begin the deployment and this can take a few minutes to complete.
+
+### Testing with MCP Inspector
+
+When using `aspire deploy`, the MCP Inspector will _not_ be provisioned or running as part of your Aspire deployment.
+
+### Troubleshooting
+
+#### Deployment fails after deleting production resources
+
+Aspire stores deployment state separately when using `aspire deploy` then it does when using `aspire run`.
+
+When you run `aspire deploy`, it should print out a message like this:
+
+```sh
+(deploy-prereq) i [INF] Deployment state will be loaded from: /a/long/path/to/production.json
+```
+
+That file is what stores the _deployment_ secrets. You need to perform the same cleanup where you delete all `Azure:Deployments:*` keys from the file.
+
+This will force Aspire to re-provision the resources from scratch.
 
 ## Infrastructure
 

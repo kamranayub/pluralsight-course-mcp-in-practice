@@ -1,10 +1,14 @@
-using System.Numerics;
+#pragma warning disable ASPIREPIPELINES001
+#pragma warning disable ASPIREPIPELINES002
+
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Aspire.Hosting.Azure;
+using Aspire.Hosting.Azure.AppContainers;
+using Aspire.Hosting.Pipelines;
 using Azure.Core;
 using Azure.Provisioning;
-using Azure.Provisioning.AppService;
 using Azure.Provisioning.CognitiveServices;
-using Azure.Provisioning.Expressions;
 using Azure.Provisioning.Resources;
 using Azure.Provisioning.Search;
 using Azure.Provisioning.Storage;
@@ -15,7 +19,6 @@ using Globomantics.Demo.AppHost.Search;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 public static class AppHostMcpDemoExtensions
 {
@@ -47,15 +50,88 @@ public static class AppHostMcpDemoExtensions
 
         hrmApi
             .WithEnvironment("HRM_API_AAD_CLIENT_ID", hrmApiAadClientId)
+            .WithEnvironment("WEBSITE_AUTH_AAD_ALLOWED_TENANTS", azureTenantId)
             .WithEnvironment("MICROSOFT_PROVIDER_AUTHENTICATION_SECRET", hrmApiAadClientSecret);
 
-        if (builder.ExecutionContext.IsPublishMode) 
+
+        // var hrmApiAuthBicep = builder.AddBicepTemplate("hrm-api-bicep", "infra/hrm-api-auth.bicep")
+        //     .WithParameter("name", hrmApi.Resource.Name)
+        //     .WithParameter("clientId", hrmApiAadClientId)
+        //     .WithParameter("mcpClientId", mcpServerAadClientId);
+
+        // See: https://learn.microsoft.com/en-us/azure/container-apps/authentication-entra
+        // See: https://learn.microsoft.com/en-us/azure/container-apps/authentication#secure-endpoints-with-easyauth
+        builder.Pipeline.AddStep("update-hrm-api-microsoft-auth", async (context) =>
         {
-            builder.AddBicepTemplate("hrm-api-bicep", "infra/hrm-api-auth.bicep")            
-                .WithParameter("name", hrmApi.Resource.Name)
-                .WithParameter("clientId", hrmApiAadClientId)
-                .WithParameter("mcpClientId", mcpServerAadClientId);
-        }
+            var deploymentStateManager = context.Services.GetRequiredService<IDeploymentStateManager>();
+            var azureDeploymentConfig = await deploymentStateManager.AcquireSectionAsync("Azure");
+            var resourceGroupName = azureDeploymentConfig.Data["ResourceGroup"]!.GetValue<string>();
+
+            var tenantId = await azureTenantId.Resource.GetValueAsync(context.CancellationToken);
+            var clientId = await hrmApiAadClientId.Resource.GetValueAsync(context.CancellationToken);
+            var allowedAudiences = string.Join(", ", [clientId, $"api://{clientId}", $"api://{clientId}/user_impersonation"]);
+
+            var configureAuthTask = await context.ReportingStep
+                    .CreateTaskAsync($"Configuring Microsoft Entra authentication for hrm-api ACA resource", context.CancellationToken)
+                    .ConfigureAwait(false);
+
+            await using (configureAuthTask.ConfigureAwait(false))
+            {
+                try
+                {
+                    var updateMicrosoftAuthProcess = Process.Start(CreateAzStartInfo(
+                        "containerapp", "auth", "microsoft", "update",
+                        "--name", hrmApi.Resource.Name,
+                        "--resource-group", resourceGroupName,
+                        "--client-id", clientId!,
+                        "--client-secret-name", "microsoft-provider-authentication-secret", // Matches the environment variable set earlier but as a container app secret
+                        "--tenant-id", tenantId!,
+                        "--allowed-audiences", allowedAudiences,
+                        "--yes"
+                    ));
+
+                    if (updateMicrosoftAuthProcess == null)
+                    {
+                        await configureAuthTask.CompleteAsync(
+                            "Failed to start az CLI process",
+                            CompletionState.CompletedWithWarning,
+                            context.CancellationToken).ConfigureAwait(false);
+                        return;
+                    }
+
+                    var stdoutTask = updateMicrosoftAuthProcess.StandardOutput.ReadToEndAsync();
+                    var stderrTask = updateMicrosoftAuthProcess.StandardError.ReadToEndAsync();
+
+                    await updateMicrosoftAuthProcess.WaitForExitAsync(context.CancellationToken).ConfigureAwait(false);
+
+                    var stdout = await stdoutTask.ConfigureAwait(false);
+                    var stderr = await stderrTask.ConfigureAwait(false);
+
+                    if (updateMicrosoftAuthProcess.ExitCode != 0)
+                    {
+                        await configureAuthTask.CompleteAsync(
+                            $"az CLI process exited with code {updateMicrosoftAuthProcess.ExitCode}\nSTDOUT: {stdout}\nSTDERR: {stderr}",
+                            CompletionState.CompletedWithError,
+                            context.CancellationToken).ConfigureAwait(false);
+
+                        return;
+                    }
+
+                    await configureAuthTask.CompleteAsync(
+                        $"Successfully configured Microsoft Entra authentication for hrm-api ACA resource.\nSTDOUT: {stdout}",
+                        CompletionState.Completed,
+                        context.CancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    await configureAuthTask.CompleteAsync(
+                        $"Error configuring Microsoft Entra authentication: {ex.Message}",
+                        CompletionState.CompletedWithWarning,
+                        context.CancellationToken).ConfigureAwait(false);
+                }
+            }
+        }, requiredBy: WellKnownPipelineSteps.Deploy, dependsOn: "provision-hrm-api-containerapp");
+
 
         return builder;
     }
@@ -179,7 +255,7 @@ public static class AppHostMcpDemoExtensions
                 logger.LogDebug("Using Blob managed identity connection string: {ConnectionString}", connectionString);
 
                 var dataSourceName = $"{aiSearch.Resource.Name}-datasource";
-                var skillsetName =$"{aiSearch.Resource.Name}-skillset";
+                var skillsetName = $"{aiSearch.Resource.Name}-skillset";
                 var indexName = $"{aiSearch.Resource.Name}-index";
 
                 var dataSource = await HrmSearchSteps.CreateOrUpdateSearchDataSource(logger, indexerClient, dataSourceName, blobContainerName!, connectionString);
@@ -192,7 +268,7 @@ public static class AppHostMcpDemoExtensions
                         embeddingResourceUri: foundryUri
                     )
                 };
-                
+
                 var index = await HrmSearchSteps.CreateOrUpdateSearchIndex(
                     logger, indexClient, indexName,
                     embeddingDeploymentName: embedding.Resource.DeploymentName,
@@ -206,4 +282,30 @@ public static class AppHostMcpDemoExtensions
 
         return builder;
     }
+
+    static ProcessStartInfo CreateAzStartInfo(params string[] args)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "cmd.exe" : "az",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            psi.ArgumentList.Add("/d");
+            psi.ArgumentList.Add("/c");
+            psi.ArgumentList.Add("az.cmd");
+        }
+
+        foreach (var a in args)
+            psi.ArgumentList.Add(a);
+
+        return psi;
+    }
+
+
 }

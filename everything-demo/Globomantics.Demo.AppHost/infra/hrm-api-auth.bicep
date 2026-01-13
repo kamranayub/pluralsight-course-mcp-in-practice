@@ -1,3 +1,6 @@
+@description('The location for all resources. Automatically provided by Aspire.')
+param location string
+
 @description('The name of the Function App to configure')
 param name string
 
@@ -13,18 +16,7 @@ var tokenAudiences array = [clientId, 'api://${clientId}', 'api://${clientId}/us
 @description('The allowed AAD client application IDs for the Function App')
 var clientApps array = [clientId, mcpClientId]
 
-// Create base application settings
-var allAppSettings = {
-  WEBSITE_AUTH_AAD_ALLOWED_TENANTS: tenant().tenantId
-}
-
-// App settings
-resource webAppSettings 'Microsoft.Web/sites/config@2025-03-01' = {
-  name: '${name}/appsettings'
-  properties: allAppSettings
-}
-
-// App settings
+// Web config
 resource webSettings 'Microsoft.Web/sites/config@2025-03-01' = {
   name: '${name}/web'
   properties: {
@@ -38,6 +30,7 @@ resource webSettings 'Microsoft.Web/sites/config@2025-03-01' = {
   }
 }
 
+// AuthSettingsV2 for Entra ID authentication
 resource authSettingsV2 'Microsoft.Web/sites/config@2025-03-01' = {
   name: '${name}/authsettingsV2'
   properties: {
@@ -72,3 +65,5 @@ resource authSettingsV2 'Microsoft.Web/sites/config@2025-03-01' = {
     }
   }
 }
+
+output authSettingsV2Name string = authSettingsV2.name
