@@ -89,7 +89,8 @@ if (enableMcpAuth) {
             var aadOAuthServerUrl = $"https://login.microsoftonline.com/{tenantId}/v2.0";
             var mcpClientId = builder.Configuration["MCP_SERVER_AAD_CLIENT_ID"];
             
-            options.Scope = $"api://{mcpClientId}/user_impersonation";
+            // This is configured on the MCP App Registration in Entra ID under "API Permissions"
+            options.Scope = $"api://{mcpClientId}/mcp";
 
             options.ResourceMetadata = new()
             {

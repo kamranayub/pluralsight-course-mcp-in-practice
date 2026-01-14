@@ -183,7 +183,7 @@ public static class AppHostMcpDemoExtensions
 
                     foreach (var azDeploymentState in azureDeploymentConfig.Data)
                     {
-                        if (azDeploymentState.Key.StartsWith("Deployments:"))
+                        if (azDeploymentState.Key.StartsWith("Deployments:") || azDeploymentState.Key == "ResourceGroup")
                         {
                             azureDeploymentConfig.Data[azDeploymentState.Key] = null;
                         }
@@ -207,7 +207,7 @@ public static class AppHostMcpDemoExtensions
                         {
                             foreach (var secret in rootObject.DeepClone().AsObject())
                             {
-                                if (secret.Key.StartsWith("Azure:Deployments:"))
+                                if (secret.Key.StartsWith("Azure:Deployments:") || secret.Key == "Azure:ResourceGroup")
                                 {
                                     rootObject.Remove(secret.Key);
                                 }

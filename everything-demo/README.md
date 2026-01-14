@@ -231,8 +231,8 @@ This command will:
 1. Delete any if found
 1. Find any soft-deleted AI Foundry tagged with `aspire-resource-name: <AI foundry resource name>`
 1. Purge them, if found
-1. Clear deployment state of `Azure:Deployment:*` keys for `aspire deploy`
-1. Clear user secrets of `Azure:Deployment:*` keys for `aspire run`
+1. Clear deployment state of `Azure:Deployment:*` and `Azure:ResourceGroup` keys for `aspire deploy`
+1. Clear user secrets of `Azure:Deployment:*` and `Azure:ResourceGroup` keys for `aspire run`
 
 > ![IMPORTANT]
 > This command will not ask for confirmation but will log each resource it deletes. It also
@@ -439,6 +439,14 @@ from the browser, you will also need to configure Redirect URIs.
   - `http://localhost:6274/oauth/callback/debug`
   - `http://localhost:6274/oauth/callback`
   - These are to support the MCP Inspector OAuth flow
+1. Under **API Permissions**, add the following scope:
+  - **Name:** mcp
+  - **Who can consent?**: Admins and users
+  - **Admin consent display name:** Access MCP server
+  - **Admin consent description:** Access MCP server tools, prompts, and resources
+  - **User consent display name:** Grant access to MCP server
+  - **User consent description:** Allow MCP server to access your basic user data
+  - Once created, it will look like `api://{mcpServerAadClientId}/mcp`
 1. Under **Certificates and Secrets**, add a **New Client Secret**
   - Be sure to copy the secret for the `mcpServerAadClientSecret` parameter
 1. Add a delegated API permission scope following the steps below
