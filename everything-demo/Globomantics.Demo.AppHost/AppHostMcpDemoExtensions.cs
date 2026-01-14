@@ -441,7 +441,7 @@ public static class AppHostMcpDemoExtensions
         builder.Pipeline.AddStep($"provision-{aiSearch.Resource.Name}-roles-{foundry.Resource.Name}", async (context) =>
         {
             var assignRolesTask = await context.ReportingStep
-                    .CreateTaskAsync($"Assigning RBAC roles to {aiSearch.Resource.Name} for {aiSearch.Resource.Name}", context.CancellationToken)
+                    .CreateTaskAsync($"Assigning RBAC roles to {aiSearch.Resource.Name} for {foundry.Resource.Name}", context.CancellationToken)
                     .ConfigureAwait(false);
 
             await using (assignRolesTask.ConfigureAwait(false))
