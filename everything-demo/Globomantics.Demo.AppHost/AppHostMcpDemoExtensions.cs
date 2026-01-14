@@ -1,8 +1,10 @@
 #pragma warning disable ASPIREPIPELINES001
 #pragma warning disable ASPIREPIPELINES002
+#pragma warning disable ASPIREUSERSECRETS001
 
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text.Json.Nodes;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.Azure.AppContainers;
 using Aspire.Hosting.Pipelines;
@@ -76,7 +78,7 @@ public static class AppHostMcpDemoExtensions
             {
                 try
                 {
-                    
+
                     await ConfigureContainerAppAuthWithMicrosoft(hrmApi.Resource.Name, resourceGroupName, tenantId!, clientId!, allowedAudiences, configureAuthTask, context.CancellationToken).ConfigureAwait(false);
                     var containerAppEndpoint = await GetContainerAppEndpoint(hrmApi.Resource.Name, resourceGroupName, clientId!, configureAuthTask, context.CancellationToken).ConfigureAwait(false) ?? throw new InvalidOperationException("Failed to retrieve container app endpoint");
                     await ConfigureContainerAppAuthRedirectUri(containerAppEndpoint, clientId!, configureAuthTask, context.CancellationToken).ConfigureAwait(false);
@@ -102,7 +104,7 @@ public static class AppHostMcpDemoExtensions
             var azureDeploymentConfig = await deploymentStateManager.AcquireSectionAsync("Azure");
             var resourceGroupName = azureDeploymentConfig.Data["ResourceGroup"]!.GetValue<string>();
 
-             var configureCorsTask = await context.ReportingStep
+            var configureCorsTask = await context.ReportingStep
                     .CreateTaskAsync($"Configuring CORS policy for {mcp.Resource.Name} ACA resource", context.CancellationToken)
                     .ConfigureAwait(false);
 
@@ -116,7 +118,7 @@ public static class AppHostMcpDemoExtensions
                         $"Successfully configured CORS policy for {mcp.Resource.Name} ACA resource.",
                         CompletionState.Completed,
                         context.CancellationToken).ConfigureAwait(false);
-                } 
+                }
                 catch (Exception ex)
                 {
                     await configureCorsTask.CompleteAsync(
@@ -126,6 +128,117 @@ public static class AppHostMcpDemoExtensions
                 }
             }
         }, requiredBy: WellKnownPipelineSteps.Deploy, dependsOn: new string[] { $"provision-{mcp.Resource.Name}-containerapp" });
+
+        builder.Pipeline.AddStep("clean-az", async (context) =>
+        {
+            var cleanResourcesTask = await context.ReportingStep
+                    .CreateTaskAsync($"Cleaning up Azure-provisioned Aspire resources...", context.CancellationToken)
+                    .ConfigureAwait(false);
+
+            await using (cleanResourcesTask.ConfigureAwait(false))
+            {
+                try
+                {
+                    var resourceGroupNames = await GetAspireResourceGroups(context.CancellationToken).ConfigureAwait(false);
+
+                    if (resourceGroupNames.Length > 0)
+                    {
+                        await cleanResourcesTask.UpdateStatusAsync($"Deleting {resourceGroupNames.Length} resource groups tagged with {{aspire: true}}", context.CancellationToken).ConfigureAwait(false);
+
+                        foreach (var resourceGroupName in resourceGroupNames)
+                        {
+                            context.Logger.LogInformation("Deleting resource group {ResourceGroupName}...", resourceGroupName);
+
+                            await DeleteResourceGroup(resourceGroupName, context.CancellationToken).ConfigureAwait(false);
+                        }
+                    }
+
+                    var foundryResource = context.Model.Resources
+                        .OfType<AzureAIFoundryResource>()
+                        .FirstOrDefault();
+
+                    if (foundryResource != null)
+                    {
+                        context.Logger.LogInformation("Checking whether {FoundryAccountName} is soft-deleted...", foundryResource.Name);
+
+                        var softDeletedFoundryAccounts = await GetSoftDeletedFoundryAccounts(foundryResource.Name, context.CancellationToken).ConfigureAwait(false);
+
+                        if (softDeletedFoundryAccounts.Length > 0)
+                        {
+                            await cleanResourcesTask.UpdateStatusAsync($"Purging {softDeletedFoundryAccounts.Length} soft-deleted Foundry accounts", context.CancellationToken).ConfigureAwait(false);
+
+                            foreach (var foundryResourceId in softDeletedFoundryAccounts)
+                            {
+                                context.Logger.LogInformation("Purging Foundry account {FoundryAccountName}...", foundryResourceId);
+
+                                await DeleteAzResourceById(foundryResourceId, context.CancellationToken).ConfigureAwait(false);
+                            }
+                        }
+                    }
+
+                    await cleanResourcesTask.UpdateStatusAsync($"Deleting Azure provisioning deployment state...", context.CancellationToken).ConfigureAwait(false);
+
+                    var deploymentStateManager = context.Services.GetRequiredService<IDeploymentStateManager>();
+                    var azureDeploymentConfig = await deploymentStateManager.AcquireSectionAsync("Azure");
+
+                    foreach (var azDeploymentState in azureDeploymentConfig.Data)
+                    {
+                        if (azDeploymentState.Key.StartsWith("Deployments:"))
+                        {
+                            azureDeploymentConfig.Data[azDeploymentState.Key] = null;
+                        }
+                    }
+
+                    await deploymentStateManager.SaveSectionAsync(azureDeploymentConfig).ConfigureAwait(false);
+
+                    context.Logger.LogInformation("Deleted Azure deployment state");
+
+                    var userSecretsManager = context.Services.GetService<IUserSecretsManager>();
+
+                    if (userSecretsManager?.FilePath != null && File.Exists(userSecretsManager.FilePath))
+                    {
+                        var secretFileContents = await File.ReadAllTextAsync(
+                            userSecretsManager.FilePath,
+                            context.CancellationToken).ConfigureAwait(false);
+
+                        JsonNode rootNode = JsonNode.Parse(secretFileContents)!;
+
+                        if (rootNode is JsonObject rootObject)
+                        {
+                            foreach (var secret in rootObject.DeepClone().AsObject())
+                            {
+                                if (secret.Key.StartsWith("Azure:Deployments:"))
+                                {
+                                    rootObject.Remove(secret.Key);
+                                }
+                            }
+
+                            var updatedSecretFileContents = rootObject.ToJsonString(
+                                new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+
+                            await File.WriteAllTextAsync(
+                                userSecretsManager.FilePath,
+                            updatedSecretFileContents,
+                            context.CancellationToken).ConfigureAwait(false);
+
+                            context.Logger.LogInformation("Deleted Azure deployment state from user secrets");
+                        }
+                    }
+
+                    await cleanResourcesTask.CompleteAsync(
+                        $"Successfully cleaned up Aspire resource groups",
+                        CompletionState.Completed,
+                        context.CancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    await cleanResourcesTask.CompleteAsync(
+                        $"Error cleaning up Aspire resource groups: {ex.Message}",
+                        CompletionState.CompletedWithError,
+                        context.CancellationToken).ConfigureAwait(false);
+                }
+            }
+        });
 
         return builder;
     }
@@ -286,6 +399,108 @@ public static class AppHostMcpDemoExtensions
         }
     }
 
+    private static async Task<string[]> GetAspireResourceGroups(CancellationToken ct)
+    {
+        var getResourceGroupsProcess = Process.Start(CreateAzStartInfo(
+            "group", "list",
+            "--query", "[?tags.aspire=='true'].{name: name}",
+            "-o", "tsv"
+        )) ?? throw new InvalidOperationException("Failed to start az CLI process");
+
+        var stdoutTask = getResourceGroupsProcess.StandardOutput.ReadToEndAsync(ct);
+        var stderrTask = getResourceGroupsProcess.StandardError.ReadToEndAsync(ct);
+
+        await getResourceGroupsProcess.WaitForExitAsync(ct).ConfigureAwait(false);
+
+        var stdout = await stdoutTask.ConfigureAwait(false);
+        var stderr = await stderrTask.ConfigureAwait(false);
+
+        if (getResourceGroupsProcess.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"az CLI process exited with code {getResourceGroupsProcess.ExitCode}\nSTDOUT: {stdout}\nSTDERR: {stderr}");
+        }
+
+        return [.. stdout.Split(",", StringSplitOptions.RemoveEmptyEntries).Select(r => r.Trim())];
+    }
+
+    private static async Task DeleteResourceGroup(string resourceGroupName, CancellationToken ct)
+    {
+        var deleteResourceGroupProcess = Process.Start(CreateAzStartInfo(
+            "group", "delete",
+            "--name", resourceGroupName,
+            "--yes",
+            "--no-wait"
+        ));
+
+        if (deleteResourceGroupProcess == null)
+        {
+            throw new InvalidOperationException("Failed to start az CLI process");
+        }
+
+        var stdoutTask = deleteResourceGroupProcess.StandardOutput.ReadToEndAsync(ct);
+        var stderrTask = deleteResourceGroupProcess.StandardError.ReadToEndAsync(ct);
+
+        await deleteResourceGroupProcess.WaitForExitAsync(ct).ConfigureAwait(false);
+
+        var stdout = await stdoutTask.ConfigureAwait(false);
+        var stderr = await stderrTask.ConfigureAwait(false);
+
+        if (deleteResourceGroupProcess.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"az CLI process exited with code {deleteResourceGroupProcess.ExitCode}\nSTDOUT: {stdout}\nSTDERR: {stderr}");
+        }
+    }
+
+    private static async Task<string[]> GetSoftDeletedFoundryAccounts(string foundryResourceName, CancellationToken ct)
+    {
+        var getDeletedFoundryAccounts = Process.Start(CreateAzStartInfo(
+            "cognitiveservices", "account", "list-deleted",
+            "--query", $"[?tags.\"aspire-resource-name\"=='{foundryResourceName}'].id",
+            "-o", "tsv"
+        )) ?? throw new InvalidOperationException("Failed to start az CLI process");
+
+        var stdoutTask = getDeletedFoundryAccounts.StandardOutput.ReadToEndAsync(ct);
+        var stderrTask = getDeletedFoundryAccounts.StandardError.ReadToEndAsync(ct);
+
+        await getDeletedFoundryAccounts.WaitForExitAsync(ct).ConfigureAwait(false);
+
+        var stdout = await stdoutTask.ConfigureAwait(false);
+        var stderr = await stderrTask.ConfigureAwait(false);
+
+        if (getDeletedFoundryAccounts.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"az CLI process exited with code {getDeletedFoundryAccounts.ExitCode}\nSTDOUT: {stdout}\nSTDERR: {stderr}");
+        }
+
+        return [.. stdout.Split(",", StringSplitOptions.RemoveEmptyEntries).Select(r => r.Trim())];
+    }
+
+    private static async Task DeleteAzResourceById(string resourceId, CancellationToken ct)
+    {
+        var azDeleteResourceProcess = Process.Start(CreateAzStartInfo(
+            "resource", "delete",
+            "--ids", resourceId,
+            "--no-wait"
+        )) ?? throw new InvalidOperationException("Failed to start az CLI process");
+
+        var stdoutTask = azDeleteResourceProcess.StandardOutput.ReadToEndAsync(ct);
+        var stderrTask = azDeleteResourceProcess.StandardError.ReadToEndAsync(ct);
+
+        await azDeleteResourceProcess.WaitForExitAsync(ct).ConfigureAwait(false);
+
+        var stdout = await stdoutTask.ConfigureAwait(false);
+        var stderr = await stderrTask.ConfigureAwait(false);
+
+        if (azDeleteResourceProcess.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"az CLI process exited with code {azDeleteResourceProcess.ExitCode}\nSTDOUT: {stdout}\nSTDERR: {stderr}");
+        }
+    }
+
     public static IDistributedApplicationBuilder AddAzureMcpDemoResources(
         this IDistributedApplicationBuilder builder,
         TokenCredential azureCredential,
@@ -329,11 +544,11 @@ public static class AppHostMcpDemoExtensions
                 var blobDataReaderRole = Guid.Parse(StorageBuiltInRole.StorageBlobDataReader.ToString());
 
                 await RoleAssignments.EnsureRoleAssignmentAsync(
-                    azureCredential, 
-                    storageAccountId!, 
-                    searchServicePrincipalId, 
-                    blobDataReaderRole, 
-                    RoleManagementPrincipalType.ServicePrincipal, 
+                    azureCredential,
+                    storageAccountId!,
+                    searchServicePrincipalId,
+                    blobDataReaderRole,
+                    RoleManagementPrincipalType.ServicePrincipal,
                     cancellationToken);
 
                 logger.LogInformation("RBAC granted: principal {PrincipalId} -> Storage Blob Data Reader on {Scope}", searchServicePrincipalId, storageAccountId);
@@ -362,11 +577,11 @@ public static class AppHostMcpDemoExtensions
             var openAiUserRole = Guid.Parse(CognitiveServicesBuiltInRole.CognitiveServicesOpenAIUser.ToString());
 
             await RoleAssignments.EnsureRoleAssignmentAsync(
-                azureCredential, 
-                foundryAccountId!, 
-                searchServicePrincipalId, 
-                openAiUserRole, 
-                RoleManagementPrincipalType.ServicePrincipal, 
+                azureCredential,
+                foundryAccountId!,
+                searchServicePrincipalId,
+                openAiUserRole,
+                RoleManagementPrincipalType.ServicePrincipal,
                 cancellationToken);
 
             logger.LogInformation("RBAC granted: principal {PrincipalId} -> OpenAI User on {Scope}", searchServicePrincipalId, foundryAccountId);
@@ -407,16 +622,16 @@ public static class AppHostMcpDemoExtensions
             {
                 try
                 {
-                    var signedInUserPrincipalId = await GetSignedInUserPrincipalId(uploadPdfTask, context.CancellationToken).ConfigureAwait(false) 
+                    var signedInUserPrincipalId = await GetSignedInUserPrincipalId(uploadPdfTask, context.CancellationToken).ConfigureAwait(false)
                         ?? throw new InvalidOperationException("Failed to determine signed-in user principal ID from Azure CLI");
-                    var storageAccountId = await hrmDocumentStorage.GetOutput("StorageAccountResourceId").GetValueAsync(context.CancellationToken) 
+                    var storageAccountId = await hrmDocumentStorage.GetOutput("StorageAccountResourceId").GetValueAsync(context.CancellationToken)
                         ?? throw new InvalidOperationException("Failed to determine storage account resource ID from HRM document storage resource outputs");
 
                     await RoleAssignments.EnsureRoleAssignmentAsync(
-                        credential: azureCredential, 
-                        scopeResourceId: storageAccountId, 
-                        principalId: signedInUserPrincipalId, 
-                        roleDefinitionGuid: Guid.Parse(StorageBuiltInRole.StorageBlobDataContributor.ToString()), 
+                        credential: azureCredential,
+                        scopeResourceId: storageAccountId,
+                        principalId: signedInUserPrincipalId,
+                        roleDefinitionGuid: Guid.Parse(StorageBuiltInRole.StorageBlobDataContributor.ToString()),
                         principalType: RoleManagementPrincipalType.User,
                         ct: context.CancellationToken);
 
@@ -454,9 +669,9 @@ public static class AppHostMcpDemoExtensions
                     var foundryAccountId = await foundry.GetOutput("FoundryAccountResourceId").GetValueAsync(context.CancellationToken);
                     var openAiUserRole = Guid.Parse(CognitiveServicesBuiltInRole.CognitiveServicesOpenAIUser.ToString());
                     await RoleAssignments.EnsureRoleAssignmentAsync(
-                        azureCredential, 
-                        foundryAccountId!, 
-                        searchServicePrincipalId, 
+                        azureCredential,
+                        foundryAccountId!,
+                        searchServicePrincipalId,
                         openAiUserRole,
                         RoleManagementPrincipalType.ServicePrincipal,
                         context.CancellationToken);
@@ -492,10 +707,10 @@ public static class AppHostMcpDemoExtensions
                     var storageAccountId = await hrmDocumentStorage.GetOutput("StorageAccountResourceId").GetValueAsync(context.CancellationToken);
                     var blobDataReaderRole = Guid.Parse(StorageBuiltInRole.StorageBlobDataReader.ToString());
                     await RoleAssignments.EnsureRoleAssignmentAsync(
-                        azureCredential, 
-                        storageAccountId!, 
-                        searchServicePrincipalId, 
-                        blobDataReaderRole, 
+                        azureCredential,
+                        storageAccountId!,
+                        searchServicePrincipalId,
+                        blobDataReaderRole,
                         RoleManagementPrincipalType.ServicePrincipal,
                         context.CancellationToken);
 
@@ -543,7 +758,7 @@ public static class AppHostMcpDemoExtensions
                         $"{aiSearch.Resource.Name}-skillset",
                         $"{aiSearch.Resource.Name}-index",
                         context.CancellationToken).ConfigureAwait(false);
-                    
+
                     await provisionHrmSearchIndexerTask.CompleteAsync(
                         $"Successfully created HRM search indexer for PDF documents.",
                         CompletionState.Completed,
@@ -555,7 +770,7 @@ public static class AppHostMcpDemoExtensions
                         $"Error provisioning AI Search indexer: {ex.Message}",
                         CompletionState.CompletedWithError,
                         context.CancellationToken).ConfigureAwait(false);
-                }                
+                }
             }
 
         }, requiredBy: WellKnownPipelineSteps.Deploy, dependsOn: new string[] { "upload-hrm-pdf-documents", $"provision-{aiSearch.Resource.Name}" });

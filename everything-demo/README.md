@@ -96,11 +96,10 @@ Follow the **Dashboard** link to view the Aspire dashboard and find your service
 The following Aspire resources should be **Healthy**:
 
 - `mcp` - MCP server project (C#) hosted by default at `http://localhost:5000`
+- `hrm-api` - Azure Functions project hosted on `http://localhost:5002`
 - `mcp-inspector` - MCP inspector (npx) hosted by default at `http://localhost:6274`
-- `mcp-patcher` - Fixes a known issue with MCP Inspector that makes it incompatible with Entra ID-based OAuth flows
-- `hrm-api` - Azure Functions project hosted on `http://localhost:7040`
+- `mcp-inspector-entra-patcher` - Fixes a known issue with MCP Inspector that makes it incompatible with Entra ID-based OAuth flows
 - `hrm-documents-storage` - Azure blob storage (with PDFs pre-baked)
-- `funcstorage...` - Azure Functions project backing storage
 
 ## Using the MCP Inspector
 
@@ -216,41 +215,56 @@ view the Search Indexer in the Azure portal for details.
 
 ### Deleting and Cleaning Up Resources
 
-Aspire does not automatically teardown your provisioned Azure resources. While every effort has been made to use the Free SKUs for each resource,
-there may still be costs associated with keeping the resources provisioned.
+Aspire does not automatically teardown your provisioned Azure resources. While every effort has been made to use the Free SKUs for each resource, there may still be costs associated with keeping the resources provisioned.
 
-To delete the resources Aspire provisions, find the resource group name:
+#### Automated Task
 
-**Using the .NET User Secrets Tool**
-
-```sh
-dotnet user-secrets list --project Globomantics.Demo.AppHost/Globomantics.Demo.AppHost.csproj
-```
-
-The resource group name is stored in the `Azure:ResourceGroup` secret.
-
-**Using the Azure Portal**
-
-Under Resource Groups, add a **Filter** for the tag `aspire` with a value of `true`.
-
-![Azure Resource Groups: Filter by aspire: true](../.github/docs-azure-aspire-deletion.png)
-
-Once you find the resource group, delete it using the Azure CLI (or Azure Portal):
+To delete all the resources Aspire provisions in Azure, run the following pipeline step:
 
 ```sh
-az group delete --name <RESOURCE_GROUP_NAME> --yes --no-wait
+aspire do clean-az
 ```
 
-#### Purging AI Foundry Resources
+This command will:
 
-> [!IMPORTANT]
-> The Azure AI Foundry resource will only be _soft-deleted._ Azure keeps it around for a few days before purging it.
+1. Search for any resource groups in your subscription tagged with `aspire: true` 
+1. Delete any if found
+1. Find any soft-deleted AI Foundry tagged with `aspire-resource-name: <AI foundry resource name>`
+1. Purge them, if found
+1. Clear deployment state of `Azure:Deployment:*` keys for `aspire deploy`
+1. Clear user secrets of `Azure:Deployment:*` keys for `aspire run`
 
-If you want to purge it right away, in the Azure Portal navigate to the AI Foundry resources overview and in the quick action toolbar, select "Manage Deleted Resources":
+> ![IMPORTANT]
+> This command will not ask for confirmation but will log each resource it deletes. It also
+> filters resources to Aspire-related resources only.
 
-![Azure Foundry: Manage Deleted Resources](../.github/docs-azure-foundry-deletion.png)
+If you live in fear, you can do the steps manually with the `az` CLI -- but it will take longer!
 
-Select the Foundry resource, and click "Purge." This will have to be done before `aspire run` will provision a Foundry resource again!
+#### Manual Steps: Deleting Resources
+
+First, find the resource groups tagged `aspire: true`:
+
+```sh
+rg=$(az group list --query "[?tags.aspire=='true'].{name: name}" -o tsv)
+az group delete --name $rg --yes --no-wait
+```
+
+Then, find and purge all soft-deleted Foundry resources that match the expected Aspire resource name:
+
+```sh
+foundry=$(az cognitiveservices account list-deleted --query '[?tags."aspire-resource-name"=='hrm-foundry'].id' -o tsv)
+az resources delete --ids $foundry
+```
+
+> [!WARNING]
+> The Azure AI Foundry resource will only be _soft-deleted_ when you delete the resource group. Azure keeps it around for a few days before purging it. Trying to re-run `aspire run` or `aspire deploy` will throw an error when provisioning the `hrm-foundry` resource if you don't purge it.
+
+> [!TIP]
+> In PowerShell, the `--query` argument [has weird quote problems](https://learn.microsoft.com/en-us/cli/azure/use-azure-cli-successfully-powershell?view=azure-cli-latest&tabs=read%2Cwin2%2CBash2#pass-spaces-in-azure-cli-parameters). Try this:
+> 
+>     az cognitiveservices account list-deleted --query '[?tags.\""aspire-resource-name\""==''hrm-foundry''].id' -o tsv
+
+#### Manual Steps: Clearing Azure Deployment State
 
 > [!CAUTION]
 > If you delete the Azure resource group, `aspire run` will not re-provision resources automatically but they will still appear "Healthy." You will need to **clear the user secrets** of all Azure deployment-related keys in order to re-provision Azure resources during `aspire run`.
