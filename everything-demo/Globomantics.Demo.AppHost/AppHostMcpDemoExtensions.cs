@@ -58,7 +58,7 @@ public static class AppHostMcpDemoExtensions
 
         // See: https://learn.microsoft.com/en-us/azure/container-apps/authentication-entra
         // See: https://learn.microsoft.com/en-us/azure/container-apps/authentication#secure-endpoints-with-easyauth
-        builder.Pipeline.AddStep("update-hrm-api-microsoft-auth", async (context) =>
+        builder.Pipeline.AddStep($"update-{hrmApi.Resource.Name}-microsoft-auth", async (context) =>
         {
             var deploymentStateManager = context.Services.GetRequiredService<IDeploymentStateManager>();
             var azureDeploymentConfig = await deploymentStateManager.AcquireSectionAsync("Azure");
@@ -69,20 +69,20 @@ public static class AppHostMcpDemoExtensions
             string[] allowedAudiences = [$"{clientId}", $"api://{clientId}", $"api://{clientId}/user_impersonation"];
 
             var configureAuthTask = await context.ReportingStep
-                    .CreateTaskAsync($"Configuring Microsoft Entra authentication for hrm-api ACA resource", context.CancellationToken)
+                    .CreateTaskAsync($"Configuring Microsoft Entra authentication for {hrmApi.Resource.Name} ACA resource", context.CancellationToken)
                     .ConfigureAwait(false);
 
             await using (configureAuthTask.ConfigureAwait(false))
             {
                 try
                 {
-                    await EnableContainerAppCorsPolicyForMcpInspector(mcp.Resource.Name, resourceGroupName, configureAuthTask, context.CancellationToken).ConfigureAwait(false);
+                    
                     await ConfigureContainerAppAuthWithMicrosoft(hrmApi.Resource.Name, resourceGroupName, tenantId!, clientId!, allowedAudiences, configureAuthTask, context.CancellationToken).ConfigureAwait(false);
                     var containerAppEndpoint = await GetContainerAppEndpoint(hrmApi.Resource.Name, resourceGroupName, clientId!, configureAuthTask, context.CancellationToken).ConfigureAwait(false) ?? throw new InvalidOperationException("Failed to retrieve container app endpoint");
                     await ConfigureContainerAppAuthRedirectUri(containerAppEndpoint, clientId!, configureAuthTask, context.CancellationToken).ConfigureAwait(false);
 
                     await configureAuthTask.CompleteAsync(
-                        $"Successfully configured Microsoft Entra authentication for hrm-api ACA resource.",
+                        $"Successfully configured Microsoft Entra authentication for {hrmApi.Resource.Name} ACA resource.",
                         CompletionState.Completed,
                         context.CancellationToken).ConfigureAwait(false);
                 }
@@ -94,13 +94,43 @@ public static class AppHostMcpDemoExtensions
                         context.CancellationToken).ConfigureAwait(false);
                 }
             }
-        }, requiredBy: WellKnownPipelineSteps.Deploy, dependsOn: new string[] { "provision-mcp-containerapp", "provision-hrm-api-containerapp" });
+        }, requiredBy: WellKnownPipelineSteps.Deploy, dependsOn: new string[] { $"provision-{hrmApi.Resource.Name}-containerapp" });
 
+        builder.Pipeline.AddStep($"update-{mcp.Resource.Name}-cors-policy", async context =>
+        {
+            var deploymentStateManager = context.Services.GetRequiredService<IDeploymentStateManager>();
+            var azureDeploymentConfig = await deploymentStateManager.AcquireSectionAsync("Azure");
+            var resourceGroupName = azureDeploymentConfig.Data["ResourceGroup"]!.GetValue<string>();
+
+             var configureCorsTask = await context.ReportingStep
+                    .CreateTaskAsync($"Configuring CORS policy for {mcp.Resource.Name} ACA resource", context.CancellationToken)
+                    .ConfigureAwait(false);
+
+            await using (configureCorsTask.ConfigureAwait(false))
+            {
+                try
+                {
+                    await EnableContainerAppCorsPolicyForMcpInspector(mcp.Resource.Name, resourceGroupName, configureCorsTask, context.CancellationToken).ConfigureAwait(false);
+
+                    await configureCorsTask.CompleteAsync(
+                        $"Successfully configured CORS policy for {mcp.Resource.Name} ACA resource.",
+                        CompletionState.Completed,
+                        context.CancellationToken).ConfigureAwait(false);
+                } 
+                catch (Exception ex)
+                {
+                    await configureCorsTask.CompleteAsync(
+                        $"Error configuring CORS policy: {ex.Message}",
+                        CompletionState.CompletedWithError,
+                        context.CancellationToken).ConfigureAwait(false);
+                }
+            }
+        }, requiredBy: WellKnownPipelineSteps.Deploy, dependsOn: new string[] { $"provision-{mcp.Resource.Name}-containerapp" });
 
         return builder;
     }
 
-    private static async Task EnableContainerAppCorsPolicyForMcpInspector(string containerAppName, string resourceGroupName, IReportingTask configureAuthTask, CancellationToken ct)
+    private static async Task EnableContainerAppCorsPolicyForMcpInspector(string containerAppName, string resourceGroupName, IReportingTask configureCorsTask, CancellationToken ct)
     {
         var enableCorsProcess = Process.Start(CreateAzStartInfo(
             "containerapp", "ingress", "cors", "enable",
@@ -111,7 +141,7 @@ public static class AppHostMcpDemoExtensions
 
         if (enableCorsProcess == null)
         {
-            await configureAuthTask.CompleteAsync(
+            await configureCorsTask.CompleteAsync(
                 "Failed to start az CLI process",
                 CompletionState.CompletedWithError,
                 ct).ConfigureAwait(false);
@@ -128,7 +158,7 @@ public static class AppHostMcpDemoExtensions
 
         if (enableCorsProcess.ExitCode != 0)
         {
-            await configureAuthTask.CompleteAsync(
+            await configureCorsTask.CompleteAsync(
                 $"az CLI process exited with code {enableCorsProcess.ExitCode}\nSTDOUT: {stdout}\nSTDERR: {stderr}",
                 CompletionState.CompletedWithError,
                 ct).ConfigureAwait(false);
@@ -260,7 +290,6 @@ public static class AppHostMcpDemoExtensions
         this IDistributedApplicationBuilder builder,
         TokenCredential azureCredential,
         IResourceBuilder<AzureFunctionsProjectResource> mcp,
-        IResourceBuilder<AzureFunctionsProjectResource> hrmApi,
         IResourceBuilder<AzureStorageResource> hrmDocumentStorage,
         IResourceBuilder<AzureBlobStorageContainerResource> hrmDocumentBlobs)
     {
@@ -409,10 +438,10 @@ public static class AppHostMcpDemoExtensions
 
         }, requiredBy: WellKnownPipelineSteps.Deploy, dependsOn: new string[] { $"provision-{hrmDocumentStorage.Resource.Name}" });
 
-        builder.Pipeline.AddStep($"rbac-{aiSearch.Resource.Name}", async (context) =>
+        builder.Pipeline.AddStep($"provision-{aiSearch.Resource.Name}-roles-{foundry.Resource.Name}", async (context) =>
         {
             var assignRolesTask = await context.ReportingStep
-                    .CreateTaskAsync($"Assigning RBAC roles for HRM Search service", context.CancellationToken)
+                    .CreateTaskAsync($"Assigning RBAC roles to {aiSearch.Resource.Name} for {aiSearch.Resource.Name}", context.CancellationToken)
                     .ConfigureAwait(false);
 
             await using (assignRolesTask.ConfigureAwait(false))
@@ -431,6 +460,34 @@ public static class AppHostMcpDemoExtensions
                         openAiUserRole,
                         RoleManagementPrincipalType.ServicePrincipal,
                         context.CancellationToken);
+
+                    await assignRolesTask.CompleteAsync(
+                        $"Successfully assigned RBAC roles for HRM Search service.",
+                        CompletionState.Completed,
+                        context.CancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    await assignRolesTask.CompleteAsync(
+                        $"Error assigning RBAC roles: {ex.Message}",
+                        CompletionState.CompletedWithError,
+                        context.CancellationToken).ConfigureAwait(false);
+                }
+            }
+        }, requiredBy: WellKnownPipelineSteps.Deploy, dependsOn: new string[] { $"provision-{aiSearch.Resource.Name}", $"provision-{foundry.Resource.Name}" });
+
+        builder.Pipeline.AddStep($"provision-{aiSearch.Resource.Name}-roles-{hrmDocumentStorage.Resource.Name}", async (context) =>
+        {
+            var assignRolesTask = await context.ReportingStep
+                    .CreateTaskAsync($"Assigning RBAC roles to {hrmDocumentStorage.Resource.Name} for {aiSearch.Resource.Name}", context.CancellationToken)
+                    .ConfigureAwait(false);
+
+            await using (assignRolesTask.ConfigureAwait(false))
+            {
+                try
+                {
+                    var searchServicePrincipalIdRaw = await aiSearch.GetOutput("SearchServicePrincipalId").GetValueAsync(context.CancellationToken);
+                    var searchServicePrincipalId = Guid.Parse(searchServicePrincipalIdRaw!);
 
                     var storageAccountId = await hrmDocumentStorage.GetOutput("StorageAccountResourceId").GetValueAsync(context.CancellationToken);
                     var blobDataReaderRole = Guid.Parse(StorageBuiltInRole.StorageBlobDataReader.ToString());
@@ -455,7 +512,7 @@ public static class AppHostMcpDemoExtensions
                         context.CancellationToken).ConfigureAwait(false);
                 }
             }
-        }, requiredBy: WellKnownPipelineSteps.Deploy, dependsOn: new string[] { $"provision-{aiSearch.Resource.Name}", $"provision-{foundry.Resource.Name}" });
+        }, requiredBy: WellKnownPipelineSteps.Deploy, dependsOn: new string[] { $"provision-{aiSearch.Resource.Name}", $"provision-{hrmDocumentStorage.Resource.Name}" });
 
         builder.Pipeline.AddStep($"provision-{aiSearch.Resource.Name}-indexer", async (context) =>
         {

@@ -106,7 +106,6 @@ if (hasAzureSubscriptionSet)
     builder.AddAzureMcpDemoResources(
         azureCredential,
         mcp,
-        api,
         hrmDocumentStorage,
         hrmDocumentBlobs);
 }
