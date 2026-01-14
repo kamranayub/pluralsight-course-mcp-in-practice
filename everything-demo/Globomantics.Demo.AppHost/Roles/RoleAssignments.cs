@@ -9,10 +9,11 @@ internal static class RoleAssignments
 {
     internal static async Task EnsureRoleAssignmentAsync(
         TokenCredential credential,
-    string scopeResourceId,
-    Guid principalId,
-    Guid roleDefinitionGuid,
-    CancellationToken ct)
+        string scopeResourceId,
+        Guid principalId,
+        Guid roleDefinitionGuid,
+        RoleManagementPrincipalType principalType,
+        CancellationToken ct)
     {
         var arm = new ArmClient(credential);
 
@@ -35,7 +36,7 @@ internal static class RoleAssignments
 
         var content = new RoleAssignmentCreateOrUpdateContent(roleDefinitionId, principalId)
         {
-            PrincipalType = RoleManagementPrincipalType.ServicePrincipal
+            PrincipalType = principalType
         };
 
         await roleAssignments.CreateOrUpdateAsync(

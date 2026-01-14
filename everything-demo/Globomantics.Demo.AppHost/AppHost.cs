@@ -1,10 +1,12 @@
 #pragma warning disable ASPIREINTERACTION001 
 
+using Aspire.Hosting.Azure;
 using Aspire.Hosting.JavaScript;
 using Azure.Identity;
 using Azure.Provisioning;
 using Azure.Provisioning.Storage;
 using Azure.Storage.Blobs;
+using Globomantics.Demo.AppHost.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -33,53 +35,27 @@ var api = builder.AddAzureFunctionsProject<Globomantics_Hrm_Api>("hrm-api")
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.ExecutionContext.IsPublishMode ? "Production" : "Development")
     .WithEnvironment("API_ENABLE_AUTH", enableMcpAuth.ToString())
     .WithHostStorage(hrmDocumentStorage)
-    .WithRoleAssignments(hrmDocumentStorage, 
+    .WithRoleAssignments(hrmDocumentStorage,
         StorageBuiltInRole.StorageAccountContributor,
         StorageBuiltInRole.StorageBlobDataContributor,
         StorageBuiltInRole.StorageTableDataContributor,
         StorageBuiltInRole.StorageQueueDataContributor)
     .WithExternalHttpEndpoints();
 
-
 var hrmDocumentBlobs = hrmDocumentStorage
     .AddBlobContainer("hrm-blob-service", blobContainerName: "globomanticshrdocs")
     .OnResourceReady(async (resource, e, cancellationToken) =>
     {
         var logger = e.Services.GetRequiredService<ResourceLoggerService>().GetLogger(resource);
-        var hrmDocumentConnString = await resource.GetConnectionProperty("ConnectionString").GetValueAsync(cancellationToken);
-        var hrmDocumentBlobEndpoint = await resource
-            .GetConnectionProperty("Uri").GetValueAsync(cancellationToken);
-
-        logger.LogInformation("Retrieved blob endpoint: {Endpoint}", hrmDocumentBlobEndpoint);
-
-        var blobServiceClient = hrmDocumentConnString == null
-            ? new BlobServiceClient(new Uri(hrmDocumentBlobEndpoint!), azureCredential)
-            : new BlobServiceClient(hrmDocumentConnString);
-
-        // Upload PDFs
-        var blobContainerName = await resource.GetConnectionProperty("BlobContainerName").GetValueAsync(cancellationToken);
-        var blobContainerClient = blobServiceClient.GetBlobContainerClient(blobContainerName);
-
-        await blobContainerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
-
-        var pdfFiles = Directory.GetFiles("./documents", "*.pdf");
-
-        foreach (var pdfFile in pdfFiles)
-        {
-            var filename = Path.GetFileName(pdfFile);
-            var blobClient = blobContainerClient.GetBlobClient(filename);
-            var fileInfo = await blobClient.UploadAsync(File.OpenRead(pdfFile), true, cancellationToken);
-
-            logger.LogInformation("Uploaded blob {Filename} with content hash {ContentHash}", filename, fileInfo.Value.ContentHash);
-        }
+        await resource.UploadDocumentsToStorageAsync(azureCredential, logger, cancellationToken);
     });
 
 var mcp = builder.AddAzureFunctionsProject<Globomantics_Mcp_Server>("mcp")
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.ExecutionContext.IsPublishMode ? "Production" : "Development")
-    .WithEnvironment("MCP_ENABLE_AUTH", enableMcpAuth.ToString())    
+    .WithEnvironment("MCP_ENABLE_AUTH", enableMcpAuth.ToString())
     .WithExternalHttpEndpoints()
     .WithHostStorage(hrmDocumentStorage)
-    .WithRoleAssignments(hrmDocumentStorage, 
+    .WithRoleAssignments(hrmDocumentStorage,
         StorageBuiltInRole.StorageAccountContributor,
         StorageBuiltInRole.StorageBlobDataContributor,
         StorageBuiltInRole.StorageTableDataContributor,
@@ -93,7 +69,8 @@ var mcp = builder.AddAzureFunctionsProject<Globomantics_Mcp_Server>("mcp")
     {
         var interactionService = e.Services.GetRequiredService<IInteractionService>()!;
 
-        if (!hasAzureSubscriptionSet) {
+        if (!hasAzureSubscriptionSet)
+        {
             _ = interactionService.PromptNotificationAsync(
                 title: "Information",
                 message: "Azure subscription has not been set, some MCP tools have been disabled. Refer to README for details.",
@@ -104,8 +81,9 @@ var mcp = builder.AddAzureFunctionsProject<Globomantics_Mcp_Server>("mcp")
                 cancellationToken: cancellationToken);
         }
 
-        if (!enableMcpAuth) {
-            
+        if (!enableMcpAuth)
+        {
+
             _ = interactionService.PromptNotificationAsync(
                 title: "Warning",
                 message: "MCP Authentication is disabled. MCP server is operating in Anonymous mode and is not protected. Refer to README for details.",
@@ -114,7 +92,7 @@ var mcp = builder.AddAzureFunctionsProject<Globomantics_Mcp_Server>("mcp")
                     Intent = MessageIntent.Warning
                 },
                 cancellationToken: cancellationToken);
-            
+
         }
     });
 
@@ -123,15 +101,15 @@ if (enableMcpAuth)
     builder.AddAuthMcpDemoResources(mcp, api);
 }
 
-if (hasAzureSubscriptionSet) 
+if (hasAzureSubscriptionSet)
 {
     builder.AddAzureMcpDemoResources(
         azureCredential,
-        mcp, 
+        mcp,
         api,
-        hrmDocumentStorage, 
+        hrmDocumentStorage,
         hrmDocumentBlobs);
-} 
+}
 else
 {
     hrmDocumentStorage.RunAsEmulator();
@@ -143,7 +121,8 @@ mcp.WithEnvironment("WEBSITE_HOSTNAME", ReferenceExpression.Create(
     $"{mcpEndpoint.Property(EndpointProperty.Host)}:{mcpEndpoint.Property(EndpointProperty.Port)}"));
 
 // MCP Inspector only works in Run mode and is not meant to be published
-if (builder.ExecutionContext.IsRunMode) {
+if (builder.ExecutionContext.IsRunMode)
+{
     var mcpPatcher = builder
         .AddResource(new JavaScriptAppResource("mcp-inspector-entra-patch", "npx", ""))
         .WithNpm(install: true)
@@ -161,3 +140,4 @@ if (builder.ExecutionContext.IsRunMode) {
 }
 
 builder.Build().Run();
+

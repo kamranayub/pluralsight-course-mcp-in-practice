@@ -12,10 +12,13 @@ using Azure.Provisioning.CognitiveServices;
 using Azure.Provisioning.Resources;
 using Azure.Provisioning.Search;
 using Azure.Provisioning.Storage;
+using Azure.ResourceManager.Authorization.Models;
 using Azure.Search.Documents.Indexes;
 using Azure.Search.Documents.Indexes.Models;
+using Azure.Storage.Blobs;
 using Globomantics.Demo.AppHost.Roles;
 using Globomantics.Demo.AppHost.Search;
+using Globomantics.Demo.AppHost.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -91,7 +94,7 @@ public static class AppHostMcpDemoExtensions
                         context.CancellationToken).ConfigureAwait(false);
                 }
             }
-        }, requiredBy: WellKnownPipelineSteps.Deploy, dependsOn: new string[] {"provision-mcp-containerapp", "provision-hrm-api-containerapp"});
+        }, requiredBy: WellKnownPipelineSteps.Deploy, dependsOn: new string[] { "provision-mcp-containerapp", "provision-hrm-api-containerapp" });
 
 
         return builder;
@@ -296,7 +299,13 @@ public static class AppHostMcpDemoExtensions
 
                 var blobDataReaderRole = Guid.Parse(StorageBuiltInRole.StorageBlobDataReader.ToString());
 
-                await RoleAssignments.EnsureRoleAssignmentAsync(azureCredential, storageAccountId!, searchServicePrincipalId, blobDataReaderRole, cancellationToken);
+                await RoleAssignments.EnsureRoleAssignmentAsync(
+                    azureCredential, 
+                    storageAccountId!, 
+                    searchServicePrincipalId, 
+                    blobDataReaderRole, 
+                    RoleManagementPrincipalType.ServicePrincipal, 
+                    cancellationToken);
 
                 logger.LogInformation("RBAC granted: principal {PrincipalId} -> Storage Blob Data Reader on {Scope}", searchServicePrincipalId, storageAccountId);
             });
@@ -323,7 +332,13 @@ public static class AppHostMcpDemoExtensions
 
             var openAiUserRole = Guid.Parse(CognitiveServicesBuiltInRole.CognitiveServicesOpenAIUser.ToString());
 
-            await RoleAssignments.EnsureRoleAssignmentAsync(azureCredential, foundryAccountId!, searchServicePrincipalId, openAiUserRole, cancellationToken);
+            await RoleAssignments.EnsureRoleAssignmentAsync(
+                azureCredential, 
+                foundryAccountId!, 
+                searchServicePrincipalId, 
+                openAiUserRole, 
+                RoleManagementPrincipalType.ServicePrincipal, 
+                cancellationToken);
 
             logger.LogInformation("RBAC granted: principal {PrincipalId} -> OpenAI User on {Scope}", searchServicePrincipalId, foundryAccountId);
         });
@@ -345,39 +360,180 @@ public static class AppHostMcpDemoExtensions
             .OnBeforeResourceStarted(async (resource, e, cancellationToken) =>
             {
                 var logger = e.Services.GetRequiredService<ResourceLoggerService>().GetLogger(resource);
-                var config = e.Services.GetRequiredService<IConfiguration>();
 
                 logger.LogInformation("Provisioning AI Search configuration for HRM data...");
 
-                var searchEndpoint = await aiSearch.Resource.GetConnectionProperty("Uri").GetValueAsync(cancellationToken);
-                var foundryEndpoint = await foundry.Resource.GetConnectionProperty("Uri").GetValueAsync(cancellationToken);
-                var hrmDocumentBlobEndpoint = await hrmDocumentBlobs.Resource.GetConnectionProperty("Uri").GetValueAsync(cancellationToken);
+                await CreateOrUpdateSearchIndex(azureCredential, logger, cancellationToken);
 
-                logger.LogDebug("Discovered AI Search endpoint: {Endpoint}", searchEndpoint);
-                logger.LogDebug("Discovered AI Foundry endpoint: {Endpoint}", foundryEndpoint);
-                logger.LogDebug("Discovered HRM Document Blob endpoint: {Endpoint}", hrmDocumentBlobEndpoint);
+                logger.LogInformation("Successfully provisioned AI Search index, vectorizer, skillset, and data source for HRM data.");
+            });
 
-                var foundryUri = new Uri(foundryEndpoint!);
-                var foundryResourceName = foundryUri.Host.Split('.').First();
-                var storageAccountName = new Uri(hrmDocumentBlobEndpoint!).Host.Split('.').First();
-                var blobContainerName = await hrmDocumentBlobs.Resource.GetConnectionProperty("BlobContainerName").GetValueAsync(cancellationToken);
+        builder.Pipeline.AddStep("upload-hrm-pdf-documents", async (context) =>
+        {
+            var uploadPdfTask = await context.ReportingStep
+                    .CreateTaskAsync($"Uploading PDF documents to HRM blob storage", context.CancellationToken)
+                    .ConfigureAwait(false);
 
-                logger.LogDebug("Discovered HRM Document Blob Container Name: {BlobContainer}", blobContainerName);
+            await using (uploadPdfTask.ConfigureAwait(false))
+            {
+                try
+                {
+                    var signedInUserPrincipalId = await GetSignedInUserPrincipalId(uploadPdfTask, context.CancellationToken).ConfigureAwait(false) 
+                        ?? throw new InvalidOperationException("Failed to determine signed-in user principal ID from Azure CLI");
+                    var storageAccountId = await hrmDocumentStorage.GetOutput("StorageAccountResourceId").GetValueAsync(context.CancellationToken) 
+                        ?? throw new InvalidOperationException("Failed to determine storage account resource ID from HRM document storage resource outputs");
 
-                var indexClient = new SearchIndexClient(new Uri(searchEndpoint!), azureCredential);
-                var indexerClient = new SearchIndexerClient(new Uri(searchEndpoint!), azureCredential);
-                var storageAccountResourceId = await hrmDocumentStorage.GetOutput("StorageAccountResourceId").GetValueAsync(cancellationToken);
-                var connectionString = $"ResourceId={storageAccountResourceId};";
+                    await RoleAssignments.EnsureRoleAssignmentAsync(
+                        credential: azureCredential, 
+                        scopeResourceId: storageAccountId, 
+                        principalId: signedInUserPrincipalId, 
+                        roleDefinitionGuid: Guid.Parse(StorageBuiltInRole.StorageBlobDataContributor.ToString()), 
+                        principalType: RoleManagementPrincipalType.User,
+                        ct: context.CancellationToken);
 
-                logger.LogDebug("Using Blob managed identity connection string: {ConnectionString}", connectionString);
+                    await hrmDocumentBlobs.Resource.UploadDocumentsToStorageAsync(azureCredential, context.Logger, context.CancellationToken).ConfigureAwait(false);
 
-                var dataSourceName = $"{aiSearch.Resource.Name}-datasource";
-                var skillsetName = $"{aiSearch.Resource.Name}-skillset";
-                var indexName = $"{aiSearch.Resource.Name}-index";
+                    await uploadPdfTask.CompleteAsync(
+                        $"Successfully uploaded PDF documents to HRM blob storage.",
+                        CompletionState.Completed,
+                        context.CancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    await uploadPdfTask.CompleteAsync(
+                        $"Error uploading PDF documents: {ex.Message}",
+                        CompletionState.CompletedWithError,
+                        context.CancellationToken).ConfigureAwait(false);
+                }
+            }
 
-                var dataSource = await HrmSearchSteps.CreateOrUpdateSearchDataSource(logger, indexerClient, dataSourceName, blobContainerName!, connectionString);
+        }, requiredBy: WellKnownPipelineSteps.Deploy, dependsOn: new string[] { $"provision-{hrmDocumentStorage.Resource.Name}" });
 
-                var skills = new List<SearchIndexerSkill>() {
+        builder.Pipeline.AddStep($"rbac-{aiSearch.Resource.Name}", async (context) =>
+        {
+            var assignRolesTask = await context.ReportingStep
+                    .CreateTaskAsync($"Assigning RBAC roles for HRM Search service", context.CancellationToken)
+                    .ConfigureAwait(false);
+
+            await using (assignRolesTask.ConfigureAwait(false))
+            {
+                try
+                {
+                    var searchServicePrincipalIdRaw = await aiSearch.GetOutput("SearchServicePrincipalId").GetValueAsync(context.CancellationToken);
+                    var searchServicePrincipalId = Guid.Parse(searchServicePrincipalIdRaw!);
+
+                    var foundryAccountId = await foundry.GetOutput("FoundryAccountResourceId").GetValueAsync(context.CancellationToken);
+                    var openAiUserRole = Guid.Parse(CognitiveServicesBuiltInRole.CognitiveServicesOpenAIUser.ToString());
+                    await RoleAssignments.EnsureRoleAssignmentAsync(
+                        azureCredential, 
+                        foundryAccountId!, 
+                        searchServicePrincipalId, 
+                        openAiUserRole,
+                        RoleManagementPrincipalType.ServicePrincipal,
+                        context.CancellationToken);
+
+                    var storageAccountId = await hrmDocumentStorage.GetOutput("StorageAccountResourceId").GetValueAsync(context.CancellationToken);
+                    var blobDataReaderRole = Guid.Parse(StorageBuiltInRole.StorageBlobDataReader.ToString());
+                    await RoleAssignments.EnsureRoleAssignmentAsync(
+                        azureCredential, 
+                        storageAccountId!, 
+                        searchServicePrincipalId, 
+                        blobDataReaderRole, 
+                        RoleManagementPrincipalType.ServicePrincipal,
+                        context.CancellationToken);
+
+                    await assignRolesTask.CompleteAsync(
+                        $"Successfully assigned RBAC roles for HRM Search service.",
+                        CompletionState.Completed,
+                        context.CancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    await assignRolesTask.CompleteAsync(
+                        $"Error assigning RBAC roles: {ex.Message}",
+                        CompletionState.CompletedWithError,
+                        context.CancellationToken).ConfigureAwait(false);
+                }
+            }
+        }, requiredBy: WellKnownPipelineSteps.Deploy, dependsOn: new string[] { $"provision-{aiSearch.Resource.Name}", $"provision-{foundry.Resource.Name}" });
+
+        builder.Pipeline.AddStep($"provision-{aiSearch.Resource.Name}-indexer", async (context) =>
+        {
+            var provisionHrmSearchIndexerTask = await context.ReportingStep
+                    .CreateTaskAsync($"Provisioning AI Search indexer for HRM data", context.CancellationToken)
+                    .ConfigureAwait(false);
+
+            await using (provisionHrmSearchIndexerTask.ConfigureAwait(false))
+            {
+                try
+                {
+                    await provisionHrmSearchIndexerTask.UpdateStatusAsync("Ensuring search index is created").ConfigureAwait(false);
+
+                    await CreateOrUpdateSearchIndex(
+                        azureCredential,
+                        context.Logger,
+                        context.CancellationToken).ConfigureAwait(false);
+
+                    var searchEndpoint = await aiSearch.Resource.GetConnectionProperty("Uri").GetValueAsync(context.CancellationToken);
+                    var indexerClient = new SearchIndexerClient(new Uri(searchEndpoint!), azureCredential);
+
+                    await provisionHrmSearchIndexerTask.UpdateStatusAsync("Indexing HRM PDF document data").ConfigureAwait(false);
+
+                    await HrmSearchSteps.CreateSearchIndexer(
+                        indexerClient,
+                        $"{aiSearch.Resource.Name}-indexer",
+                        $"{aiSearch.Resource.Name}-datasource",
+                        $"{aiSearch.Resource.Name}-skillset",
+                        $"{aiSearch.Resource.Name}-index",
+                        context.CancellationToken).ConfigureAwait(false);
+                    
+                    await provisionHrmSearchIndexerTask.CompleteAsync(
+                        $"Successfully created HRM search indexer for PDF documents.",
+                        CompletionState.Completed,
+                        context.CancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    await provisionHrmSearchIndexerTask.CompleteAsync(
+                        $"Error provisioning AI Search indexer: {ex.Message}",
+                        CompletionState.CompletedWithError,
+                        context.CancellationToken).ConfigureAwait(false);
+                }                
+            }
+
+        }, requiredBy: WellKnownPipelineSteps.Deploy, dependsOn: new string[] { "upload-hrm-pdf-documents", $"provision-{aiSearch.Resource.Name}" });
+
+        async Task CreateOrUpdateSearchIndex(TokenCredential azureCredential, ILogger logger, CancellationToken cancellationToken)
+        {
+            var searchEndpoint = await aiSearch.Resource.GetConnectionProperty("Uri").GetValueAsync(cancellationToken);
+            var foundryEndpoint = await foundry.Resource.GetConnectionProperty("Uri").GetValueAsync(cancellationToken);
+            var hrmDocumentBlobEndpoint = await hrmDocumentBlobs.Resource.GetConnectionProperty("Uri").GetValueAsync(cancellationToken);
+
+            logger.LogDebug("Discovered AI Search endpoint: {Endpoint}", searchEndpoint);
+            logger.LogDebug("Discovered AI Foundry endpoint: {Endpoint}", foundryEndpoint);
+            logger.LogDebug("Discovered HRM Document Blob endpoint: {Endpoint}", hrmDocumentBlobEndpoint);
+
+            var foundryUri = new Uri(foundryEndpoint!);
+            var foundryResourceName = foundryUri.Host.Split('.').First();
+            var storageAccountName = new Uri(hrmDocumentBlobEndpoint!).Host.Split('.').First();
+            var blobContainerName = await hrmDocumentBlobs.Resource.GetConnectionProperty("BlobContainerName").GetValueAsync(cancellationToken);
+
+            logger.LogDebug("Discovered HRM Document Blob Container Name: {BlobContainer}", blobContainerName);
+
+            var indexClient = new SearchIndexClient(new Uri(searchEndpoint!), azureCredential);
+            var indexerClient = new SearchIndexerClient(new Uri(searchEndpoint!), azureCredential);
+            var storageAccountResourceId = await hrmDocumentStorage.GetOutput("StorageAccountResourceId").GetValueAsync(cancellationToken);
+            var connectionString = $"ResourceId={storageAccountResourceId};";
+
+            logger.LogDebug("Using Blob managed identity connection string: {ConnectionString}", connectionString);
+
+            var dataSourceName = $"{aiSearch.Resource.Name}-datasource";
+            var skillsetName = $"{aiSearch.Resource.Name}-skillset";
+            var indexName = $"{aiSearch.Resource.Name}-index";
+
+            var dataSource = await HrmSearchSteps.CreateOrUpdateSearchDataSource(logger, indexerClient, dataSourceName, blobContainerName!, connectionString);
+
+            var skills = new List<SearchIndexerSkill>() {
                     HrmSearchSteps.CreateSplitSkill(),
                     HrmSearchSteps.CreateEmbeddingSkill(
                         deploymentId: embedding.Resource.DeploymentName,
@@ -386,18 +542,55 @@ public static class AppHostMcpDemoExtensions
                     )
                 };
 
-                var index = await HrmSearchSteps.CreateOrUpdateSearchIndex(
-                    logger, indexClient, indexName,
-                    embeddingDeploymentName: embedding.Resource.DeploymentName,
-                    embeddingModelName: embedding.Resource.ModelName,
-                    embeddingResourceUri: foundryUri
-                );
-                var skillset = await HrmSearchSteps.CreateOrUpdateSearchSkillSet(logger, indexerClient, skillsetName, skills, indexName);
-
-                logger.LogInformation("Successfully provisioned AI Search index, vectorizer, skillset, and data source for HRM data.");
-            });
+            var index = await HrmSearchSteps.CreateOrUpdateSearchIndex(
+                logger, indexClient, indexName,
+                embeddingDeploymentName: embedding.Resource.DeploymentName,
+                embeddingModelName: embedding.Resource.ModelName,
+                embeddingResourceUri: foundryUri
+            );
+            var skillset = await HrmSearchSteps.CreateOrUpdateSearchSkillSet(logger, indexerClient, skillsetName, skills, indexName);
+        }
 
         return builder;
+    }
+
+    private static async Task<Guid?> GetSignedInUserPrincipalId(IReportingTask configureAuthTask, CancellationToken ct)
+    {
+        var getSignedInUserIdProcess = Process.Start(CreateAzStartInfo(
+            "ad", "signed-in-user", "show",
+            "--query", "id",
+            "--output", "tsv"
+        ));
+
+        if (getSignedInUserIdProcess == null)
+        {
+            await configureAuthTask.CompleteAsync(
+                "Failed to start az CLI process",
+                CompletionState.CompletedWithError,
+                ct).ConfigureAwait(false);
+
+            return null;
+        }
+
+        var stdoutTask = getSignedInUserIdProcess.StandardOutput.ReadToEndAsync(ct);
+        var stderrTask = getSignedInUserIdProcess.StandardError.ReadToEndAsync(ct);
+
+        await getSignedInUserIdProcess.WaitForExitAsync(ct).ConfigureAwait(false);
+
+        var stdout = await stdoutTask.ConfigureAwait(false);
+        var stderr = await stderrTask.ConfigureAwait(false);
+
+        if (getSignedInUserIdProcess.ExitCode != 0)
+        {
+            await configureAuthTask.CompleteAsync(
+                $"az CLI process exited with code {getSignedInUserIdProcess.ExitCode}\nSTDOUT: {stdout}\nSTDERR: {stderr}",
+                CompletionState.CompletedWithError,
+                ct).ConfigureAwait(false);
+
+            return null;
+        }
+
+        return Guid.TryParse(stdout.Trim(), out var userId) ? userId : null;
     }
 
     static ProcessStartInfo CreateAzStartInfo(params string[] args)
@@ -423,6 +616,4 @@ public static class AppHostMcpDemoExtensions
 
         return psi;
     }
-
-
 }

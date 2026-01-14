@@ -513,6 +513,16 @@ Next, Aspire will ask you to select a region.
 
 Once you select a region, Aspire will begin the deployment and this can take a few minutes to complete.
 
+The pipeline logs will display the Aspire Dashboard and MCP server URLs like this:
+
+```sh
+(print-dashboard-url-aca-env) ✓ Dashboard available at
+https://aspire-dashboard.ext.<ENVIRONMENT>.<LOCATION>.eastus.azurecontainerapps.io
+
+(print-mcp-summary) i [INF] Successfully deployed mcp to
+https://mcp.<ENVIRONMENT>.<LOCATION>.azurecontainerapps.io
+```
+
 ### Testing with MCP Inspector
 
 When using `aspire deploy`, the MCP Inspector will _not_ be provisioned or started as part of your Aspire deployment.
@@ -524,15 +534,14 @@ cd Globomantics.Demo.AppHost
 npm run inspect
 ```
 
-The URL will likely reflect any previous `localhost:5000` URL you've been testing if running locally.
+Once it launches your browser, connect to the MCP server ingress URL displayed in the pipeline log to test out the MCP server.
 
-The `aspire deploy` command will print out the ingress URL for your MCP server deployment, like this:
+> [!NOTE]
+> The URL may use the previous `http://localhost:5000` URL you've been testing, if you previously ran `aspire run`.
 
-```sh
-mcp-containerapp deployed to https://<APP_NAME>.<ENVIRONMENT>.<LOCATION>.azurecontainerapps.io
-```
-
-That is the URL you'll need to set in the MCP Inspector.
+> [!IMPORTANT]
+> If deployed in **Protected Mode**, you can go through the Guided OAuth Flow to test out the authentication.
+> Be sure to use the static MCP server client ID, since Microsoft Entra does not support Dynamic Client Registration (DCR).
 
 ### Troubleshooting
 
