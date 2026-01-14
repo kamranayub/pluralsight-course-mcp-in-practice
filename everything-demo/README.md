@@ -398,9 +398,6 @@ dotnet user-secrets set "Parameters:azureTenantId" "your-tenant-id" --project ./
 
 Before you can proceed, you will need to configure two Microsoft Entra app registrations.
 
-> [!TIP]
-> You can reference [my Entra app manifest files](infra/entra/) (`infra/entra/`) to help verify your configuration.
-
 ### HRM API Entra App Registration
 
 The HRM API backend is deployed using Azure Functions and is protected by Microsoft Entra ID. The MCP server
@@ -423,7 +420,7 @@ delegated API permission scope.
       - **User consent description:** Allow the application to access the HRM API on your behalf
       - Once created, it will look like `api://{hrmApiAadClientId}/user_impersonation`
 1. Under **Certificates & Secrets**, add a **Client Secret**
-  - Be sure to copy the secret to provide for the `hrmApiAadClientSecret` parameter
+    - Be sure to copy the secret to provide for the `hrmApiAadClientSecret` parameter
 
 ### MCP Server Entra App Registration
 
@@ -434,21 +431,21 @@ from the browser, you will also need to configure Redirect URIs.
 **Steps**
 
 1. Create an **App Registration** for the MCP server
-  - Be sure to copy the **Application ID** for the `mcpServerAadClientId` parameter
+    - Be sure to copy the **Application ID** for the `mcpServerAadClientId` parameter
 1. Under **Authentication**, add the following **Single-page Application** Redirect URIs:
-  - `http://localhost:6274/oauth/callback/debug`
-  - `http://localhost:6274/oauth/callback`
-  - These are to support the MCP Inspector OAuth flow
+    - `http://localhost:6274/oauth/callback/debug`
+    - `http://localhost:6274/oauth/callback`
+    - These are to support the MCP Inspector OAuth flow
 1. Under **API Permissions**, add the following scope:
-  - **Name:** mcp
-  - **Who can consent?**: Admins and users
-  - **Admin consent display name:** Access MCP server
-  - **Admin consent description:** Access MCP server tools, prompts, and resources
-  - **User consent display name:** Grant access to MCP server
-  - **User consent description:** Allow MCP server to access your basic user data
-  - Once created, it will look like `api://{mcpServerAadClientId}/mcp`
+    - **Name:** mcp
+    - **Who can consent?**: Admins and users
+    - **Admin consent display name:** Access MCP server
+    - **Admin consent description:** Access MCP server tools, prompts, and resources
+    - **User consent display name:** Grant access to MCP server
+    - **User consent description:** Allow MCP server to access your basic user data
+    - Once created, it will look like `api://{mcpServerAadClientId}/mcp`
 1. Under **Certificates and Secrets**, add a **New Client Secret**
-  - Be sure to copy the secret for the `mcpServerAadClientSecret` parameter
+    - Be sure to copy the secret for the `mcpServerAadClientSecret` parameter
 1. Add a delegated API permission scope following the steps below
 
 #### Configuring App Delegation / Impersonation
