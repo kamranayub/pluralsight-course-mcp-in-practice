@@ -2,7 +2,7 @@
 
 This is the full course demo project. It uses [Aspire](https://aspire.dev), a cross-platform Infrastructure-as-Code (IaC) local development environment.
 
-<!-- TOC depthfrom:2 -->
+<!-- TOC depthfrom:2 depthto:3 -->
 
 - [Prerequisites](#prerequisites)
 - [Get Started](#get-started)
@@ -15,37 +15,25 @@ This is the full course demo project. It uses [Aspire](https://aspire.dev), a cr
     - [Configure Azure Integration for Aspire](#configure-azure-integration-for-aspire)
     - [Indexing the PDF Documents](#indexing-the-pdf-documents)
     - [Deleting and Cleaning Up Resources](#deleting-and-cleaning-up-resources)
-        - [Purging AI Foundry Resources](#purging-ai-foundry-resources)
     - [Troubleshooting](#troubleshooting)
-        - [The access token is from the wrong issuer](#the-access-token-is-from-the-wrong-issuer)
-        - [Authentication failed against tenant](#authentication-failed-against-tenant)
-        - [hrm-search-service: Operation would exceed 'free' tier service quota.](#hrm-search-service-operation-would-exceed-free-tier-service-quota)
-        - [hrm-foundry: Deployment failed: FlagMustBeSetForRestore](#hrm-foundry-deployment-failed-flagmustbesetforrestore)
 - [Protect the MCP Server with Entra ID optional](#protect-the-mcp-server-with-entra-id-optional)
     - [Enabling Authentication](#enabling-authentication)
     - [HRM API Entra App Registration](#hrm-api-entra-app-registration)
     - [MCP Server Entra App Registration](#mcp-server-entra-app-registration)
+    - [Provide the Entra Parameters to Aspire](#provide-the-entra-parameters-to-aspire)
+    - [Testing the Auth Flow](#testing-the-auth-flow)
+    - [Compatibility Issues with MCP Clients and Microsoft Entra](#compatibility-issues-with-mcp-clients-and-microsoft-entra)
     - [Troubleshooting](#troubleshooting)
-        - [The redirect URI specified in the request does not match](#the-redirect-uri-specified-in-the-request-does-not-match)
-- [Preparing for the Deployment](#preparing-for-the-deployment)
+- [Deploying to Azure optional](#deploying-to-azure-optional)
+    - [Preparing the Deployment](#preparing-the-deployment)
     - [Testing with MCP Inspector](#testing-with-mcp-inspector)
+    - [Custom Pipeline Deployment Steps](#custom-pipeline-deployment-steps)
     - [Troubleshooting](#troubleshooting)
-        - [Deployment fails after deleting production resources](#deployment-fails-after-deleting-production-resources)
-- [Infrastructure](#infrastructure)
-    - [Prerequisite: Entra Tenant Configuration](#prerequisite-entra-tenant-configuration)
-        - [Configuring App Delegation / Impersonation](#configuring-app-delegation--impersonation)
-    - [Provision HRM API](#provision-hrm-api)
-        - [Upload PDF Documents](#upload-pdf-documents)
-        - [Azure AI Search Configuration](#azure-ai-search-configuration)
-    - [Provision MCP Server](#provision-mcp-server)
-- [HRM API](#hrm-api)
-    - [Overview](#overview)
-    - [Authentication & identity](#authentication--identity)
-    - [Data & persistence](#data--persistence)
-    - [Notes](#notes)
-- [MCP Server](#mcp-server)
-- [Azure Blob Storage](#azure-blob-storage)
-- [Azure AI Search](#azure-ai-search)
+- [Aspire Architecture](#aspire-architecture)
+    - [HRM API](#hrm-api)
+    - [MCP Server](#mcp-server)
+    - [Azure Blob Storage](#azure-blob-storage)
+    - [Azure AI Search](#azure-ai-search)
 
 <!-- /TOC -->
 
@@ -396,6 +384,9 @@ dotnet user-secrets set "Parameters:azureTenantId" "your-tenant-id" --project ./
 
 Before you can proceed, you will need to configure two Microsoft Entra app registrations.
 
+> [!TIP]
+> You can reference [my Entra app manifest files](infra/entra/) (`infra/entra/`) to help verify your configuration.
+
 ### HRM API Entra App Registration
 
 The HRM API backend is deployed using Azure Functions and is protected by Microsoft Entra ID. The MCP server
@@ -404,11 +395,101 @@ calls this downstream API on-behalf-of the user.
 To support this, the app registration requires a client secret credential to be created, as well as a 
 delegated API permission scope.
 
+**Steps**
+
+1. Create an **App Registration** for the HRM API
+    - Be sure to copy the **App (Client) ID** for the `hrmApiAadClientId` parameter
+1. Under **Authentication**, and the **Settings** tab, ensure `ID tokens` is checked under implicit grant flow
+1. Under **Expose an API**, add **A new scope** with the following values:
+      - **Name:** user_impersonation
+      - **Who can consent?**: Admins and users
+      - **Admin consent display name:** Delegated access to the HRM API
+      - **Admin consent description:** Allow the application to access the HRM API on behalf of the signed-in user.
+      - **User consent display name:** Access the HRM API
+      - **User consent description:** Allow the application to access the HRM API on your behalf
+      - Once created, it will look like `api://{hrmApiAadClientId}/user_impersonation`
+1. Under **Certificates & Secrets**, add a **Client Secret**
+  - Be sure to copy the secret to provide for the `hrmApiAadClientSecret` parameter
+
 ### MCP Server Entra App Registration
 
-The MCP server will also be protected by Entra ID, via the OAuth support in the MCP C# SDK. This requires
+The MCP server will also be protected by Entra ID, via the native OAuth middleware in the MCP C# SDK. This requires
 another separate app registration with a client secret credential. Since some clients will connect via OAuth flows
 from the browser, you will also need to configure Redirect URIs.
+
+**Steps**
+
+1. Create an **App Registration** for the MCP server
+  - Be sure to copy the **Application ID** for the `mcpServerAadClientId` parameter
+1. Under **Authentication**, add the following **Single-page Application** Redirect URIs:
+  - `http://localhost:6274/oauth/callback/debug`
+  - `http://localhost:6274/oauth/callback`
+  - These are to support the MCP Inspector OAuth flow
+1. Under **Certificates and Secrets**, add a **New Client Secret**
+  - Be sure to copy the secret for the `mcpServerAadClientSecret` parameter
+1. Add a delegated API permission scope following the steps below
+
+#### Configuring App Delegation / Impersonation
+
+Follow the steps below to configure the MCP client to support the OBO (On-Behalf-Of) OAuth flow:
+
+1. Under **API Permissions**, click **Add a permission**.
+1. In the "Request API Permissions" drawer, select the **My APIs** tab.
+1. Select the HRM app registration you created earlier.
+1. Under "What type of permissions?" select **Delegated permissions**.
+1. Select the `user_impersonation` scope you created earlier.
+1. Click "Add Permissions"
+
+> [!IMPORTANT]
+> Make sure your account owns both the MCP server and HRM API app registrations.
+> Otherwise, the HRM API’s `user_impersonation` delegated permission won’t appear here. 
+> You can double-check this under the **Owners** section in the app registration.
+
+Once you select the scope and add the permission, it will show up under the **API Permissions** list.
+
+### Provide the Entra Parameters to Aspire
+
+You can manually set the user secrets using the `dotnet user-secrets` tool, or you can run Aspire:
+
+```sh
+aspire run
+```
+
+When you visit the Dashboard, at the top you will be asked to fill in some missing parameter values.
+These are the client IDs and secrets you just created.
+
+Once entered, Aspire will proceed to configure authentication for the `mcp` server and `hrm-api` backend.
+
+### Testing the Auth Flow
+
+When running locally with `aspire run`, authentication will now be enabled.
+
+You can test the auth flow using the MCP inspector as shown in the course, by opening it
+and going to the Auth section and using the Guided OAuth Flow screen.
+
+> [!IMPORTANT]
+> Azure Functions does **not** formerly support authentication when run locally, so a development middleware is used
+> to simulate the HTTP headers that Azure App Service Authentication provides. Under the hood, it
+> relies on Azure Identity and your Az CLI credentials to map your credential to the test users.
+
+The `plan_time_off` tool will return your current authenticated user information. You can also use
+the Swagger UI for the HRM API to call the `getAuthenticatedUserIdRaaS` API and view the response.
+
+### Compatibility Issues with MCP Clients and Microsoft Entra
+
+In **Protected Mode**, the MCP server will be protected by Microsoft Entra as the identity provider. Unfortunately, Microsoft Entra has some incompatibilities with most MCP clients:
+
+- It does not yet support Dynamic Client Registration (DCR)
+- It does not yet support Client-issued Metadata Documents (CIMD)
+- It does not support the `resource` parameter during authorization code flows (SEP-835)
+
+As a result, Microsoft Entra by itself cannot be used for most MCP clients except for Visual Studio Code. 
+For all other MCP clients, your protected MCP server **will not be compatible.**
+
+> [!NOTE]
+> For the MCP Inspector specifically, you can make it compatible with a [patch](patches/). See this [discussion](https://github.com/modelcontextprotocol/inspector/issues/685) for details. The Aspire project does this automatically for you with the `mcp-inspector-entra-patch` resource.
+
+To support other MCP clients, see the [Advanced MCP course](https://github.com/kamranayub/pluralsight-course-mcp-advanced) where we introduce an MCP Authentication Gateway. This federates authentication so that Microsoft Entra is no longer the front door for MCP clients, adds DCR support, and supports session-based token storage. This is also **more secure** as the MCP clients never see Entra ID authentication tokens and instead only are provided session-based "reference" tokens.
 
 ### Troubleshooting
 
@@ -422,9 +503,11 @@ The problem is that you do not have the MCP Inspector OAuth callback added as a 
 
 Revisit the configuration steps above to ensure you've added the redirect URI under the "Single-page Application" Redirect URIs.
 
-# Deploying the Project
+## Deploying to Azure (optional)
 
-The Aspire project supports deploying to Microsoft Azure in two modes:
+The Aspire project supports deploying to Azure and provisioning Azure Container Apps (ACA) for the MCP server and HRM backend API. It will also provision all the supporting resources, including Azure Storage, Azure AI Foundry, and Azure AI Search.
+
+The project supports deploying to Microsoft Azure in two modes:
 
 - **Anonymous:** In this mode, the MCP server is anonymous and publicly accessible but you don't need Entra ID set up.
 - **Protected:** In this mode, the MCP server is protected by Entra ID but requires additional configuration.
@@ -440,7 +523,7 @@ in the [Entra ID Setup](#enabling-authentication) section first before deploying
 > Test Protected mode locally using `aspire run` before trying to use `aspire deploy`. If it works locally,
 > it has a higher chance of "just working" when deployed.
 
-## Preparing for the Deployment
+### Preparing the Deployment
 
 To prepare for a production deployment, you must [delete any existing resources in Azure](#deleting-and-cleaning-up-resources).
 
@@ -523,6 +606,15 @@ https://aspire-dashboard.ext.<ENVIRONMENT>.<LOCATION>.eastus.azurecontainerapps.
 https://mcp.<ENVIRONMENT>.<LOCATION>.azurecontainerapps.io
 ```
 
+#### Testing Sign-in Flow
+
+Once deployed, try visiting the `hrm-api` ingress URL in your browser. You should be redirected to the Microsoft Login flow.
+If you're signed in, you'll be redirected back and be greeted with a "Your Functions App Has Been Deployed" page.
+
+> [!IMPORTANT]
+>  _Revision_ ingress URLs are not automatically added as Web Redirect URIs in Entra. Only the primary ingress URL.
+
+
 ### Testing with MCP Inspector
 
 When using `aspire deploy`, the MCP Inspector will _not_ be provisioned or started as part of your Aspire deployment.
@@ -543,6 +635,71 @@ Once it launches your browser, connect to the MCP server ingress URL displayed i
 > If deployed in **Protected Mode**, you can go through the Guided OAuth Flow to test out the authentication.
 > Be sure to use the static MCP server client ID, since Microsoft Entra does not support Dynamic Client Registration (DCR).
 
+### Custom Pipeline Deployment Steps
+
+The `aspire deploy` pipeline [can be customized](https://aspire.dev/get-started/pipelines/) to perform custom application-specific steps. These
+steps help set up and configure the Azure environment so that the MCP server and HRM backend API
+work properly without any extra manual configuration.
+
+These steps are run automatically when you run `aspire deploy`, but you can also execute them
+manually using `aspire do <step name>`.
+
+> [!NOTE]
+> Much of this automation also executes when you do `aspire run`, but pipeline steps are customized
+> for the deployment process which can vary slightly.
+
+#### `update-hrm-api-microsoft-auth`
+
+In **Protected Mode**, the HRM API backend will be protected using [Azure App Service Authentication for Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/authentication#secure-endpoints-with-easyauth).
+
+This step will:
+
+1. Configure `hrm-api` Container App with Entra authentication
+  - Uses `az containerapp auth microsoft update` command
+1. Add the ingress URL as a "Web" Redirect URI to your Entra app registration
+  - Uses `az ad app update` command
+
+#### `update-mcp-cors-policy`
+
+In **Protected Mode**, this step will run `az ingress cors enable` to add a CORS policy to allow
+the MCP inspector URL (`http://localhost:6274`). This is to allow for OAuth flows to work when
+using the MCP inspector, otherwise you will receive CORS errors.
+
+#### `provision-hrm-search-service-roles-hrm-foundry`
+
+This step assigns the `hrm-search-service` managed identity the **Cognitive Services OpenAI User** role on the `hrm-foundry`
+resource. This is required for Azure AI Search to issue requests to the text embedding model deployment.
+
+#### `provision-hrm-search-service-roles-hrm-document-storage`
+
+This step assigns the `hrm-search-service` managed identity the **Storage Blob Data Reader** role on the `hrm-document-storage`
+resource. This is so that the Azure AI Search _Indexer_ can index the PDF documents.
+
+#### `provision-hrm-search-service-indexer`
+
+In the course, in order to mitigate hallucination and provide more accurate policy information, there's a demo of
+using Azure AI Search with a RAG vector index. This is used by the `ask_about_policy` tool under-the-hood.
+
+This step does all the heavy lifting to create a [search indexing pipeline](https://learn.microsoft.com/en-us/azure/search/tutorial-skillset) in the Azure AI Search service:
+
+1. A data source that uses `hrm-document-storage` blob container to find the PDFs
+1. A skillset that supports splitting text into chunks with vector embeddings using the `hrm-foundry` model deployment
+1. A search index that supports vector embeddings and automatic query text vectorization
+1. A [search _indexer_](https://learn.microsoft.com/en-us/azure/search/search-how-to-create-indexers) which is a background task that actually performs the PDF document indexing operation
+
+The search indexer automatically runs as part of the deployment process. 
+
+> [!IMPORTANT]
+> Running the search indexer is required for the `ask_about_policy` tool to work, otherwise
+> you will not receive any document excerpts back from Azure AI Search.
+
+#### `upload-hrm-pdf-documents`
+
+This step will automatically upload all the PDF documents in the `Globomantics.Demo.AppHost/documents` folder to the
+provisioned Azure Storage blob container.
+
+This is to enable the Azure AI Search indexer to index the documents into the vector database.
+
 ### Troubleshooting
 
 #### Deployment fails after deleting production resources
@@ -555,171 +712,40 @@ When you run `aspire deploy`, it should print out a message like this:
 (deploy-prereq) i [INF] Deployment state will be loaded from: /a/long/path/to/production.json
 ```
 
-That file is what stores the _deployment_ secrets. You need to perform the same cleanup where you delete all `Azure:Deployments:*` keys from the file.
+That file is what stores the _deployment_ secrets. You need to perform [the same cleanup](#deleting-and-cleaning-up-resources) where you delete all `Azure:Deployments:*` keys from the file.
 
 This will force Aspire to re-provision the resources from scratch.
 
-## Infrastructure
+## Aspire Architecture
 
-To set up and provision all the infrastructure for this course, there's a mix of automation and manual steps outlined below:
+### HRM API
 
-1. Configure Microsoft Entra tenant
-1. Provision HRM API
-1. Configure HRM API
-1. Configure AI Search Indexer
-1. Provision MCP Server
-1. Configure MCP Server
-
-There are **two** Azure Bicep projects: `azure.yaml` and `Globomantics.Mcp.Server/azure.yaml`. These will provision **two separate resource groups** to maintain separation between the "mock infra" and the actual MCP server. They could be combined, if you want.
-
----
-
-# Old Documentation (Not Yet Migrated)
-
-> [!WARNING]
-> The following docs have not yet been updated to reflect the Aspire project.
-
-### Prerequisite: Entra Tenant Configuration
-
-> [!TIP]
-> You can reference [my Entra app manifest files](infra/entra/) (`infra/entra/`) to help verify your configuration.
-
-> [!NOTE]
-> The `tenantId` or `AZURE_TENANT_ID` references are to your Entra tenant directory (aka Azure AD).
-
-1. Create an **App Registration** for the HRM API
-    - Take note of the **App (Client) ID**
-    - Add a `user_impersonation` API permission for **Delegated** auth
-    - This is a simple setup -- the Azure Easy Auth will be configured during `azd up`
-1. Create an **App Registration** for the MCP server
-    - Add a Mobile/Desktop platform and ensure `ms-appx-web://microsoft.aad.brokerplugin/04f0c124-f2bc-4f59-8241-bf6df9866bbd` is added as a  Redirect URI
-      - This is for `Azure.Identity` Broker plug-in
-    - Add a SPA platform and ensure `http://localhost:6274/oauth/callback/debug` and `http://localhost:6274/oauth/callback` are added as Redirect URIs
-      - This is for MCP Inspector support
-    - Configure app delegation / impersonation configuration detailed below
-
-#### Configuring App Delegation / Impersonation
-
-
-Configure the MCP client app registration with [Native client app registration](https://learn.microsoft.com/en-us/azure/app-service/configure-authentication-provider-aad?tabs=workforce-configuration#native-client-application).
-
-> [!IMPORTANT]
-> The official documentation omits a key step:
-> You must add your MCP app registration’s **Application (client) ID** to the **Allowed client applications** list in the Azure App Service Authentication settings.
-> If this list is populated, Easy Auth blocks all callers that aren’t explicitly listed—including your MCP app—resulting in a 403 Forbidden response.
->
-> **This is configured for you during `azd up`.**
-
-Grant the MCP Server client app **delegated API permissions** to the HRM API (`user_impersonation` scope).
-
-- Add an **API Permission scope** for `api://{client_id}/user_impersonation` (which will allow delegated access)
-
-> [!TIP]
-> Make sure you own both the MCP server and HRM API app registrations.
-> Otherwise, the HRM API’s `user_impersonation` delegated permission won’t appear when you edit the MCP app registration.
-
-> [!IMPORTANT]
-> The demo uses a simplified (and less secure) OAuth flow that is compatible with Azure Entra ID and does not use Azure API Management. This is to keep the demos simpler and to focus on the MCP-specific implementation of OAuth.
->
-> For a real production MCP server with Azure, the best practice would be to ensure **no Entra ID tokens** are sent back to the MCP client and to use passwordless flows using managed identities. For an advanced flow that demonstrates this, see [Den Delimarsky's sample and write-up](https://github.com/localden/remote-auth-mcp-apim-py) using APIM.
->
-> In order to support the simpler flow, I had to [patch](patches/) the `@modelcontextprotocol/inspector` and `@modelcontextprotocol/inspector-client` packages, based on some work by Jeremy Smith (see [commits](https://github.com/modelcontextprotocol/inspector/compare/main...2underscores:inspector:azure-no-code-challenge-in-metadata) and [discussion](https://github.com/modelcontextprotocol/inspector/issues/685)).
->
-> In addition, the OBO flow uses an client secret flow instead of passwordless auth because it's simpler. This is less secure
-> since the `MCP_SERVER_AAD_CLIENT_SECRET` has to be provided in plain-text as an environment variable or user secret.
-
-
-### Provision HRM API
-
-**Resources Created:**
-
-- App service plan
-- Function app storage account
-- HRM document storage account (`hrmdocs`)
-- Log analytics workspace
-- App insights
-- HRM API Function app
-  - Configured with Entra (AAD) authentication
-  - Restricted to HRM/MCP client apps
-  - Always authenticate; 302 Redirect for login
-
-**Prerequisites**
-
-- You must have a Microsoft Entra ID tenant set up
-- You must create an App Registration for the Globomantics HRM client and MCP server clients
-- You must have **both** the HRM API and MCP Server **Client IDs** available
-
-1. At the root, you can run `azd up` and specify a unique environment name and location
-    - Specify `aadHrmClientId` for HRM API
-    - Specify `aadMcpClientId` for the MCP server
-1. Once provisioned, you **must** configure the Entra ID (AAD) client secret in the Azure Functions App
-    - Env Variable: `MICROSOFT_PROVIDER_AUTHENTICATION_SECRET`
-
-> [!IMPORTANT]
-> If `deployAiServices` is true, the deployment will provision a free-tier AI Search service, but **not a model deployment** or an AI Search Indexer!
-> 
-> You will still need to set these up manually as they cannot be provisioned through Bicep.
-
-#### Upload PDF Documents
-
-Before you can proceed to creating an AI Search Indexer, upload the PDF files from this repository (`hrm-docs` folder) 
-to the storage account (`sthrmdocs`) under the `globomanticshrm` blob container.
-
-#### Azure AI Search Configuration
-
-When you create an AI Search Service, Azure Portal has a few templated wizards for deploying a search indexer for Blob Containers.
-
-- Go to your AI Search Service
-- Under **Overview** tab, select the toolbar item **Import Data (new)**
-- Select **Azure Blob Storage**
-- Follow the wizard and specify the `sthrmdocs`-prefixed storage account
-
-> [!TIP]
-> Walking through the wizard will have you create all the prerequisite model and AI Foundry resources.
-
-**High-level Steps:**
-
-1. Create an AI Foundry project with a model deployment for `text-embedding-ada-002` (I used `GlobalStandard`)
-1. Create a Search Indexer created that is hooked up to the HRM Globomantics document blob storage container
-1. RBAC: Grant yourself (owner) **Search Index Data Contributor** role
-1. RBAC: Grant **Search Index Data Reader** permission for your demo employee(s) or group
-
-### Provision MCP Server
-
-In the `Globomantics.Mcp.Server` directory, you can run `azd up` with a unique environment.
-
-Once provisioned, you must add the environment variables and the `HRM_API_ENDPOINT` should point to the HRM API Functions App provisioned above.
-
-# Architecture
-
-## HRM API
-
-### Overview
+#### Overview
 - Implemented as Azure Functions (C# .NET) exposing a small HRM-compatible HTTP API.
 - Uses OpenAPI attributes to annotate operations, parameters and responses so the function app can produce API documentation and client metadata.
 - Lightweight, serverless design intended for demo / test usage backed by an in-memory MockDataStore.
 
-### Authentication & identity
+#### Authentication & identity
 - Azure Functions App has "EasyAuth" enabled, which injects authenticted user principal in HTTP headers.
 - Daemon aka S2S auth flow presents `Bearer` token in `Authorization` header for EasyAuth to authenticate (application-only authentication).
 - Native app aka OBO (On-Behalf-Of) flow requires MCP client to authenticate and MCP server to forward credetials for impersonation (delegated access).
 - The functions read claims from the incoming HttpRequest headers to identify the caller.
 - The code extracts an email claim from the parsed ClaimsPrincipal and maps it to an Employee ID via the mock store. Missing/invalid authentication returns 401.
 
-### Data & persistence
+#### Data & persistence
 - Current implementation uses a MockDataStore in memory (Workers, AbsenceTypes, BenefitPlans, TimeOffRequests).
 - Time off requests are appended in-memory and assigned a GUID for demonstration.
 - Production guidance: replace MockDataStore with durable persistence (database, blob or managed service), and avoid in-memory state across function instances.
 
-### Notes
+#### Notes
 - The API follows conventional RESTful structure for resource paths and HTTP verbs but embeds specific query conventions (e.g., Worker!Employee_ID and fixed category usage) to match the HRM integration surface.
 
-## MCP Server
+### MCP Server
 
 - The MCP server when run **locally** uses S2S (system identity) auth to talk to the HRM API and AI Search Service. This is the end-state of M3.
 - The MCP server when run **remotely** uses OBO delegated auth. It is hosted on Azure Functions using the MCP Handler customization (and not the MCP Handler extension preview). This is the end-state of M4.
 
-## Azure Blob Storage
+### Azure Blob Storage
 
 The `sthrmdocs` Azure storage account contains a `globomanticshrm` Blob container. This container keeps several PDFs (found in repo). Each blob has metadata:
 
@@ -728,6 +754,6 @@ The `sthrmdocs` Azure storage account contains a `globomanticshrm` Blob containe
 
 The `Category` metadata is used to correlate a benefit document with benefit plan data from the HRM API. This is specific to the MCP server design.
 
-## Azure AI Search
+### Azure AI Search
 
 The search service exposes a search index that indexes the PDF documents for RAG vector search. It uses an embedding model and supports querying by text.
