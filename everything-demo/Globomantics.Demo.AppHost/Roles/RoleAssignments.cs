@@ -1,3 +1,4 @@
+using Azure;
 using Azure.Core;
 using Azure.ResourceManager;
 using Azure.ResourceManager.Authorization;
@@ -40,7 +41,7 @@ internal static class RoleAssignments
         };
 
         await roleAssignments.CreateOrUpdateAsync(
-            waitUntil: Azure.WaitUntil.Completed,
+            waitUntil: WaitUntil.Completed,
             roleAssignmentName: assignmentName.ToString(),
             content: content,
             cancellationToken: ct);

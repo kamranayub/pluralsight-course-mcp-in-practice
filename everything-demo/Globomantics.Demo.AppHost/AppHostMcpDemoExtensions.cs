@@ -3,11 +3,8 @@
 #pragma warning disable ASPIREUSERSECRETS001
 #pragma warning disable ASPIREINTERACTION001
 
-using System.Diagnostics;
-using System.Runtime.InteropServices;
 using System.Text.Json.Nodes;
 using Aspire.Hosting.Azure;
-using Aspire.Hosting.Azure.AppContainers;
 using Aspire.Hosting.Pipelines;
 using Azure.Core;
 using Azure.Provisioning;
@@ -18,11 +15,10 @@ using Azure.Provisioning.Storage;
 using Azure.ResourceManager.Authorization.Models;
 using Azure.Search.Documents.Indexes;
 using Azure.Search.Documents.Indexes.Models;
-using Azure.Storage.Blobs;
+using Globomantics.Demo.AppHost.Azure;
 using Globomantics.Demo.AppHost.Roles;
 using Globomantics.Demo.AppHost.Search;
 using Globomantics.Demo.AppHost.Storage;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -80,9 +76,9 @@ public static class AppHostMcpDemoExtensions
                 try
                 {
 
-                    await ConfigureContainerAppAuthWithMicrosoft(hrmApi.Resource.Name, resourceGroupName, tenantId!, clientId!, allowedAudiences, configureAuthTask, context.CancellationToken).ConfigureAwait(false);
-                    var containerAppEndpoint = await GetContainerAppEndpoint(hrmApi.Resource.Name, resourceGroupName, clientId!, configureAuthTask, context.CancellationToken).ConfigureAwait(false) ?? throw new InvalidOperationException("Failed to retrieve container app endpoint");
-                    await ConfigureContainerAppAuthRedirectUri(containerAppEndpoint, clientId!, configureAuthTask, context.CancellationToken).ConfigureAwait(false);
+                    await AzCliCommands.ConfigureContainerAppAuthWithMicrosoft(hrmApi.Resource.Name, resourceGroupName, tenantId!, clientId!, allowedAudiences, context.CancellationToken).ConfigureAwait(false);
+                    var containerAppEndpoint = await AzCliCommands.GetContainerAppEndpoint(hrmApi.Resource.Name, resourceGroupName, clientId!, context.CancellationToken).ConfigureAwait(false) ?? throw new InvalidOperationException("Failed to retrieve container app endpoint");
+                    await AzCliCommands.ConfigureContainerAppAuthRedirectUri(containerAppEndpoint, clientId!, context.CancellationToken).ConfigureAwait(false);
 
                     await configureAuthTask.CompleteAsync(
                         $"Successfully configured Microsoft Entra authentication for {hrmApi.Resource.Name} ACA resource.",
@@ -113,7 +109,7 @@ public static class AppHostMcpDemoExtensions
             {
                 try
                 {
-                    await EnableContainerAppCorsPolicyForMcpInspector(mcp.Resource.Name, resourceGroupName, configureCorsTask, context.CancellationToken).ConfigureAwait(false);
+                    await AzCliCommands.EnableContainerAppCorsPolicyForMcpInspector(mcp.Resource.Name, resourceGroupName, context.CancellationToken).ConfigureAwait(false);
 
                     await configureCorsTask.CompleteAsync(
                         $"Successfully configured CORS policy for {mcp.Resource.Name} ACA resource.",
@@ -130,6 +126,11 @@ public static class AppHostMcpDemoExtensions
             }
         }, requiredBy: WellKnownPipelineSteps.Deploy, dependsOn: new string[] { $"provision-{mcp.Resource.Name}-containerapp" });
 
+        return builder;
+    }
+
+    public static IDistributedApplicationBuilder AddCleanAzureResourcesStep(this IDistributedApplicationBuilder builder)
+    {
         builder.Pipeline.AddStep("clean-az", async (context) =>
         {
             var confirmAutomatically = Environment.GetCommandLineArgs().Contains("--yes") 
@@ -149,14 +150,20 @@ public static class AppHostMcpDemoExtensions
 
             await using (cleanResourcesTask.ConfigureAwait(false))
             {
+                IReadOnlyList<InteractionInput> confirmInput = [
+                    new () {
+                        Name = "Confirm?",
+                        Required = true,
+                        InputType = InputType.Boolean
+                    }
+                ];
+
                 try
                 {
-                    var resourceGroupNames = await GetAspireResourceGroups(context.CancellationToken).ConfigureAwait(false);
+                    var resourceGroupNames = await AzCliCommands.GetAspireResourceGroups(context.CancellationToken).ConfigureAwait(false);
 
                     if (resourceGroupNames.Length > 0)
                     {
-                        await cleanResourcesTask.UpdateStatusAsync($"Deleting {resourceGroupNames.Length} resource groups tagged with {{aspire: true}}", context.CancellationToken).ConfigureAwait(false);
-
                         foreach (var resourceGroupName in resourceGroupNames)
                         {
                             context.Logger.LogInformation("Deleting resource group {ResourceGroupName}...", resourceGroupName);
@@ -166,65 +173,43 @@ public static class AppHostMcpDemoExtensions
                                 var shouldDelete = await interaction.PromptInputsAsync(
                                     "Confirm Deletion", $"Deleting resource group {resourceGroupName}",
                                     cancellationToken: context.CancellationToken,
-                                    inputs: [
-                                        new() {
-                                            Name = "Confirm?",
-                                            Required = true,
-                                            InputType = InputType.Boolean
-                                        }
-                                    ]).ConfigureAwait(false);
+                                    inputs: confirmInput).ConfigureAwait(false);
 
                                 if (shouldDelete.Canceled || bool.Parse(shouldDelete.Data[0].Value ?? "false") is false) {
                                     continue;
                                 }
                             }
 
-                            await DeleteResourceGroup(resourceGroupName, context.CancellationToken).ConfigureAwait(false);
+                            await AzCliCommands.DeleteResourceGroup(resourceGroupName, context.CancellationToken).ConfigureAwait(false);
                         }
                     }
 
-                    var foundryResource = context.Model.Resources
-                        .OfType<AzureAIFoundryResource>()
-                        .FirstOrDefault();
+                    var foundryResources = context.Model.Resources
+                        .OfType<AzureAIFoundryResource>();
 
-                    if (foundryResource != null)
+                    foreach (var foundryResource in foundryResources) 
                     {
                         context.Logger.LogInformation("Checking whether {FoundryAccountName} is soft-deleted...", foundryResource.Name);
 
-                        var softDeletedFoundryAccounts = await GetSoftDeletedFoundryAccounts(foundryResource.Name, context.CancellationToken).ConfigureAwait(false);
+                        var foundryResourceId = await AzCliCommands.GetSoftDeletedFoundryAccount(foundryResource.Name, context.CancellationToken).ConfigureAwait(false);
 
-                        if (softDeletedFoundryAccounts.Length > 0)
+                        if (!string.IsNullOrEmpty(foundryResourceId))
                         {
-                            await cleanResourcesTask.UpdateStatusAsync($"Purging {softDeletedFoundryAccounts.Length} soft-deleted Foundry accounts", context.CancellationToken).ConfigureAwait(false);
-
-                            foreach (var foundryResourceId in softDeletedFoundryAccounts)
+                            if (requireConfirm && interaction.IsAvailable)
                             {
-                                if (requireConfirm && interaction.IsAvailable)
-                                {
-                                    var shouldDelete = await interaction.PromptInputsAsync(
-                                        "Confirm Deletion", $"Deleting AI Foundry resource: {foundryResourceId}", 
-                                        cancellationToken: context.CancellationToken,
-                                        inputs: [
-                                            new() {
-                                                Name = "Confirm?",
-                                                Required = true,
-                                                InputType = InputType.Boolean
-                                            }
-                                        ]).ConfigureAwait(false);
+                                var shouldDelete = await interaction.PromptInputsAsync(
+                                    "Confirm Deletion", $"Deleting AI Foundry resource: {foundryResourceId}", 
+                                    cancellationToken: context.CancellationToken,
+                                    inputs: confirmInput).ConfigureAwait(false);
 
-                                    if (shouldDelete.Canceled || bool.Parse(shouldDelete.Data[0].Value ?? "false") is false) {
-                                        continue;
-                                    }
+                                if (bool.Parse(shouldDelete.Data?[0].Value ?? "false") is true) {
+                                    context.Logger.LogInformation("Purging Foundry account {FoundryAccountName}...", foundryResourceId);
+
+                                    await AzCliCommands.DeleteAzResourceById(foundryResourceId, context.CancellationToken).ConfigureAwait(false);   
                                 }
-
-                                context.Logger.LogInformation("Purging Foundry account {FoundryAccountName}...", foundryResourceId);
-
-                                await DeleteAzResourceById(foundryResourceId, context.CancellationToken).ConfigureAwait(false);
-                            }
+                            }               
                         }
                     }
-
-                    await cleanResourcesTask.UpdateStatusAsync($"Deleting Azure provisioning deployment state...", context.CancellationToken).ConfigureAwait(false);
 
                     var deploymentStateManager = context.Services.GetRequiredService<IDeploymentStateManager>();
                     var azureDeploymentConfig = await deploymentStateManager.AcquireSectionAsync("Azure");
@@ -291,264 +276,7 @@ public static class AppHostMcpDemoExtensions
         return builder;
     }
 
-    private static async Task EnableContainerAppCorsPolicyForMcpInspector(string containerAppName, string resourceGroupName, IReportingTask configureCorsTask, CancellationToken ct)
-    {
-        var enableCorsProcess = Process.Start(CreateAzStartInfo(
-            "containerapp", "ingress", "cors", "enable",
-            "--name", containerAppName,
-            "--resource-group", resourceGroupName,
-            "--allowed-origins", "http://localhost:6274"
-        ));
-
-        if (enableCorsProcess == null)
-        {
-            await configureCorsTask.CompleteAsync(
-                "Failed to start az CLI process",
-                CompletionState.CompletedWithError,
-                ct).ConfigureAwait(false);
-            return;
-        }
-
-        var stdoutTask = enableCorsProcess.StandardOutput.ReadToEndAsync(ct);
-        var stderrTask = enableCorsProcess.StandardError.ReadToEndAsync(ct);
-
-        await enableCorsProcess.WaitForExitAsync(ct).ConfigureAwait(false);
-
-        var stdout = await stdoutTask.ConfigureAwait(false);
-        var stderr = await stderrTask.ConfigureAwait(false);
-
-        if (enableCorsProcess.ExitCode != 0)
-        {
-            await configureCorsTask.CompleteAsync(
-                $"az CLI process exited with code {enableCorsProcess.ExitCode}\nSTDOUT: {stdout}\nSTDERR: {stderr}",
-                CompletionState.CompletedWithError,
-                ct).ConfigureAwait(false);
-
-            return;
-        }
-    }
-
-    private static async Task ConfigureContainerAppAuthWithMicrosoft(string containerAppName, string resourceGroupName, string tenantId, string clientId, string[] allowedAudiences, IReportingTask configureAuthTask, CancellationToken ct)
-    {
-        var updateMicrosoftAuthProcess = Process.Start(CreateAzStartInfo(
-            "containerapp", "auth", "microsoft", "update",
-            "--name", containerAppName,
-            "--resource-group", resourceGroupName,
-            "--client-id", clientId!,
-            "--client-secret-name", "microsoft-provider-authentication-secret", // Matches the environment variable set earlier but as a container app secret
-            "--tenant-id", tenantId!,
-            "--allowed-audiences", string.Join(",", allowedAudiences),
-            "--yes"
-        ));
-
-        if (updateMicrosoftAuthProcess == null)
-        {
-            await configureAuthTask.CompleteAsync(
-                "Failed to start az CLI process",
-                CompletionState.CompletedWithError,
-                ct).ConfigureAwait(false);
-            return;
-        }
-
-        var stdoutTask = updateMicrosoftAuthProcess.StandardOutput.ReadToEndAsync(ct);
-        var stderrTask = updateMicrosoftAuthProcess.StandardError.ReadToEndAsync(ct);
-
-        await updateMicrosoftAuthProcess.WaitForExitAsync(ct).ConfigureAwait(false);
-
-        var stdout = await stdoutTask.ConfigureAwait(false);
-        var stderr = await stderrTask.ConfigureAwait(false);
-
-        if (updateMicrosoftAuthProcess.ExitCode != 0)
-        {
-            await configureAuthTask.CompleteAsync(
-                $"az CLI process exited with code {updateMicrosoftAuthProcess.ExitCode}\nSTDOUT: {stdout}\nSTDERR: {stderr}",
-                CompletionState.CompletedWithError,
-                ct).ConfigureAwait(false);
-
-            return;
-        }
-    }
-
-    private static async Task<Uri?> GetContainerAppEndpoint(string containerAppName, string resourceGroupName, string clientId, IReportingTask configureAuthTask, CancellationToken ct)
-    {
-        var getContainerAppFqdnProcess = Process.Start(CreateAzStartInfo(
-            "containerapp", "show",
-            "--name", containerAppName,
-            "--resource-group", resourceGroupName,
-            "--query", "properties.configuration.ingress.fqdn",
-            "--output", "tsv"
-        ));
-
-        if (getContainerAppFqdnProcess == null)
-        {
-            await configureAuthTask.CompleteAsync(
-                "Failed to start az CLI process",
-                CompletionState.CompletedWithError,
-                ct).ConfigureAwait(false);
-
-            return null;
-        }
-
-        var stdoutTask = getContainerAppFqdnProcess.StandardOutput.ReadToEndAsync(ct);
-        var stderrTask = getContainerAppFqdnProcess.StandardError.ReadToEndAsync(ct);
-
-        await getContainerAppFqdnProcess.WaitForExitAsync(ct).ConfigureAwait(false);
-
-        var stdout = await stdoutTask.ConfigureAwait(false);
-        var stderr = await stderrTask.ConfigureAwait(false);
-
-        if (getContainerAppFqdnProcess.ExitCode != 0)
-        {
-            await configureAuthTask.CompleteAsync(
-                $"az CLI process exited with code {getContainerAppFqdnProcess.ExitCode}\nSTDOUT: {stdout}\nSTDERR: {stderr}",
-                CompletionState.CompletedWithError,
-                ct).ConfigureAwait(false);
-
-            return null;
-        }
-
-        var fqdn = stdout.Trim();
-        return new Uri($"https://{fqdn}");
-    }
-
-    private static async Task ConfigureContainerAppAuthRedirectUri(Uri containerEndpoint, string clientId, IReportingTask configureAuthTask, CancellationToken ct)
-    {
-        var updateEntraAppRedirectUris = Process.Start(CreateAzStartInfo(
-            "ad", "app", "update",
-            "--id", clientId,
-            "--web-redirect-uris", new Uri(containerEndpoint, ".auth/login/aad/callback").ToString()
-        ));
-
-        if (updateEntraAppRedirectUris == null)
-        {
-            await configureAuthTask.CompleteAsync(
-                "Failed to start az CLI process",
-                CompletionState.CompletedWithWarning,
-                ct).ConfigureAwait(false);
-            return;
-        }
-
-        var stdoutTask = updateEntraAppRedirectUris.StandardOutput.ReadToEndAsync(ct);
-        var stderrTask = updateEntraAppRedirectUris.StandardError.ReadToEndAsync(ct);
-
-        await updateEntraAppRedirectUris.WaitForExitAsync(ct).ConfigureAwait(false);
-
-        var stdout = await stdoutTask.ConfigureAwait(false);
-        var stderr = await stderrTask.ConfigureAwait(false);
-
-        if (updateEntraAppRedirectUris.ExitCode != 0)
-        {
-            await configureAuthTask.CompleteAsync(
-                $"az CLI process exited with code {updateEntraAppRedirectUris.ExitCode}\nSTDOUT: {stdout}\nSTDERR: {stderr}",
-                CompletionState.CompletedWithError,
-                ct).ConfigureAwait(false);
-
-            return;
-        }
-    }
-
-    private static async Task<string[]> GetAspireResourceGroups(CancellationToken ct)
-    {
-        var getResourceGroupsProcess = Process.Start(CreateAzStartInfo(
-            "group", "list",
-            "--query", "[?tags.aspire=='true'].{name: name}",
-            "-o", "tsv"
-        )) ?? throw new InvalidOperationException("Failed to start az CLI process");
-
-        var stdoutTask = getResourceGroupsProcess.StandardOutput.ReadToEndAsync(ct);
-        var stderrTask = getResourceGroupsProcess.StandardError.ReadToEndAsync(ct);
-
-        await getResourceGroupsProcess.WaitForExitAsync(ct).ConfigureAwait(false);
-
-        var stdout = await stdoutTask.ConfigureAwait(false);
-        var stderr = await stderrTask.ConfigureAwait(false);
-
-        if (getResourceGroupsProcess.ExitCode != 0)
-        {
-            throw new InvalidOperationException(
-                $"az CLI process exited with code {getResourceGroupsProcess.ExitCode}\nSTDOUT: {stdout}\nSTDERR: {stderr}");
-        }
-
-        return [.. stdout.Split(",", StringSplitOptions.RemoveEmptyEntries).Select(r => r.Trim())];
-    }
-
-    private static async Task DeleteResourceGroup(string resourceGroupName, CancellationToken ct)
-    {
-        var deleteResourceGroupProcess = Process.Start(CreateAzStartInfo(
-            "group", "delete",
-            "--name", resourceGroupName,
-            "--yes"
-        ));
-
-        if (deleteResourceGroupProcess == null)
-        {
-            throw new InvalidOperationException("Failed to start az CLI process");
-        }
-
-        var stdoutTask = deleteResourceGroupProcess.StandardOutput.ReadToEndAsync(ct);
-        var stderrTask = deleteResourceGroupProcess.StandardError.ReadToEndAsync(ct);
-
-        await deleteResourceGroupProcess.WaitForExitAsync(ct).ConfigureAwait(false);
-
-        var stdout = await stdoutTask.ConfigureAwait(false);
-        var stderr = await stderrTask.ConfigureAwait(false);
-
-        if (deleteResourceGroupProcess.ExitCode != 0)
-        {
-            throw new InvalidOperationException(
-                $"az CLI process exited with code {deleteResourceGroupProcess.ExitCode}\nSTDOUT: {stdout}\nSTDERR: {stderr}");
-        }
-    }
-
-    private static async Task<string[]> GetSoftDeletedFoundryAccounts(string foundryResourceName, CancellationToken ct)
-    {
-        var getDeletedFoundryAccounts = Process.Start(CreateAzStartInfo(
-            "cognitiveservices", "account", "list-deleted",
-            "--query", $"[?tags.\"aspire-resource-name\"=='{foundryResourceName}'].id",
-            "-o", "tsv"
-        )) ?? throw new InvalidOperationException("Failed to start az CLI process");
-
-        var stdoutTask = getDeletedFoundryAccounts.StandardOutput.ReadToEndAsync(ct);
-        var stderrTask = getDeletedFoundryAccounts.StandardError.ReadToEndAsync(ct);
-
-        await getDeletedFoundryAccounts.WaitForExitAsync(ct).ConfigureAwait(false);
-
-        var stdout = await stdoutTask.ConfigureAwait(false);
-        var stderr = await stderrTask.ConfigureAwait(false);
-
-        if (getDeletedFoundryAccounts.ExitCode != 0)
-        {
-            throw new InvalidOperationException(
-                $"az CLI process exited with code {getDeletedFoundryAccounts.ExitCode}\nSTDOUT: {stdout}\nSTDERR: {stderr}");
-        }
-
-        return [.. stdout.Split(",", StringSplitOptions.RemoveEmptyEntries).Select(r => r.Trim())];
-    }
-
-    private static async Task DeleteAzResourceById(string resourceId, CancellationToken ct)
-    {
-        var azDeleteResourceProcess = Process.Start(CreateAzStartInfo(
-            "resource", "delete",
-            "--ids", resourceId,
-            "--no-wait"
-        )) ?? throw new InvalidOperationException("Failed to start az CLI process");
-
-        var stdoutTask = azDeleteResourceProcess.StandardOutput.ReadToEndAsync(ct);
-        var stderrTask = azDeleteResourceProcess.StandardError.ReadToEndAsync(ct);
-
-        await azDeleteResourceProcess.WaitForExitAsync(ct).ConfigureAwait(false);
-
-        var stdout = await stdoutTask.ConfigureAwait(false);
-        var stderr = await stderrTask.ConfigureAwait(false);
-
-        if (azDeleteResourceProcess.ExitCode != 0)
-        {
-            throw new InvalidOperationException(
-                $"az CLI process exited with code {azDeleteResourceProcess.ExitCode}\nSTDOUT: {stdout}\nSTDERR: {stderr}");
-        }
-    }
-
-    public static IDistributedApplicationBuilder AddAzureMcpDemoResources(
+    public static IDistributedApplicationBuilder AddAzureDemoResources(
         this IDistributedApplicationBuilder builder,
         TokenCredential azureCredential,
         IResourceBuilder<AzureFunctionsProjectResource> mcp,
@@ -669,7 +397,7 @@ public static class AppHostMcpDemoExtensions
             {
                 try
                 {
-                    var signedInUserPrincipalId = await GetSignedInUserPrincipalId(uploadPdfTask, context.CancellationToken).ConfigureAwait(false)
+                    var signedInUserPrincipalId = await AzCliCommands.GetSignedInUserPrincipalId(context.CancellationToken).ConfigureAwait(false)
                         ?? throw new InvalidOperationException("Failed to determine signed-in user principal ID from Azure CLI");
                     var storageAccountId = await hrmDocumentStorage.GetOutput("StorageAccountResourceId").GetValueAsync(context.CancellationToken)
                         ?? throw new InvalidOperationException("Failed to determine storage account resource ID from HRM document storage resource outputs");
@@ -873,66 +601,5 @@ public static class AppHostMcpDemoExtensions
         return builder;
     }
 
-    private static async Task<Guid?> GetSignedInUserPrincipalId(IReportingTask configureAuthTask, CancellationToken ct)
-    {
-        var getSignedInUserIdProcess = Process.Start(CreateAzStartInfo(
-            "ad", "signed-in-user", "show",
-            "--query", "id",
-            "--output", "tsv"
-        ));
-
-        if (getSignedInUserIdProcess == null)
-        {
-            await configureAuthTask.CompleteAsync(
-                "Failed to start az CLI process",
-                CompletionState.CompletedWithError,
-                ct).ConfigureAwait(false);
-
-            return null;
-        }
-
-        var stdoutTask = getSignedInUserIdProcess.StandardOutput.ReadToEndAsync(ct);
-        var stderrTask = getSignedInUserIdProcess.StandardError.ReadToEndAsync(ct);
-
-        await getSignedInUserIdProcess.WaitForExitAsync(ct).ConfigureAwait(false);
-
-        var stdout = await stdoutTask.ConfigureAwait(false);
-        var stderr = await stderrTask.ConfigureAwait(false);
-
-        if (getSignedInUserIdProcess.ExitCode != 0)
-        {
-            await configureAuthTask.CompleteAsync(
-                $"az CLI process exited with code {getSignedInUserIdProcess.ExitCode}\nSTDOUT: {stdout}\nSTDERR: {stderr}",
-                CompletionState.CompletedWithError,
-                ct).ConfigureAwait(false);
-
-            return null;
-        }
-
-        return Guid.TryParse(stdout.Trim(), out var userId) ? userId : null;
-    }
-
-    static ProcessStartInfo CreateAzStartInfo(params string[] args)
-    {
-        var psi = new ProcessStartInfo
-        {
-            FileName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "cmd.exe" : "az",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-        };
-
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            psi.ArgumentList.Add("/d");
-            psi.ArgumentList.Add("/c");
-            psi.ArgumentList.Add("az.cmd");
-        }
-
-        foreach (var a in args)
-            psi.ArgumentList.Add(a);
-
-        return psi;
-    }
+    
 }

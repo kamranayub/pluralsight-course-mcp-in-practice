@@ -103,11 +103,13 @@ if (enableMcpAuth)
 
 if (hasAzureSubscriptionSet)
 {
-    builder.AddAzureMcpDemoResources(
-        azureCredential,
-        mcp,
-        hrmDocumentStorage,
-        hrmDocumentBlobs);
+    builder
+        .AddAzureDemoResources(
+            azureCredential,
+            mcp,
+            hrmDocumentStorage,
+            hrmDocumentBlobs)
+        .AddCleanAzureResourcesStep();
 }
 else
 {
