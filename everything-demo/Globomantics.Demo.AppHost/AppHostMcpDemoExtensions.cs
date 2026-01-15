@@ -132,6 +132,15 @@ public static class AppHostMcpDemoExtensions
 
         builder.Pipeline.AddStep("clean-az", async (context) =>
         {
+            var confirmAutomatically = Environment.GetCommandLineArgs().Contains("--yes") 
+                || Environment.GetCommandLineArgs().Contains("-y");
+
+            if (confirmAutomatically)
+            {
+                context.Logger.LogWarning("Automatic confirmation enabled; skipping resource deletion prompts.");
+            }
+
+            var requireConfirm = !confirmAutomatically;
             var interaction = context.Services.GetRequiredService<IInteractionService>();
 
             var cleanResourcesTask = await context.ReportingStep
@@ -152,7 +161,7 @@ public static class AppHostMcpDemoExtensions
                         {
                             context.Logger.LogInformation("Deleting resource group {ResourceGroupName}...", resourceGroupName);
 
-                            if (interaction.IsAvailable)
+                            if (requireConfirm && interaction.IsAvailable)
                             {
                                 var shouldDelete = await interaction.PromptInputsAsync(
                                     "Confirm Deletion", $"Deleting resource group {resourceGroupName}",
@@ -190,7 +199,7 @@ public static class AppHostMcpDemoExtensions
 
                             foreach (var foundryResourceId in softDeletedFoundryAccounts)
                             {
-                                if (interaction.IsAvailable)
+                                if (requireConfirm && interaction.IsAvailable)
                                 {
                                     var shouldDelete = await interaction.PromptInputsAsync(
                                         "Confirm Deletion", $"Deleting AI Foundry resource: {foundryResourceId}", 
@@ -468,8 +477,7 @@ public static class AppHostMcpDemoExtensions
         var deleteResourceGroupProcess = Process.Start(CreateAzStartInfo(
             "group", "delete",
             "--name", resourceGroupName,
-            "--yes",
-            "--no-wait"
+            "--yes"
         ));
 
         if (deleteResourceGroupProcess == null)

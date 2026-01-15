@@ -10,7 +10,7 @@ This is the full course demo project. It uses [Aspire](https://aspire.dev), a cr
 - [Connecting to the MCP Server](#connecting-to-the-mcp-server)
     - [Visual Studio Code default](#visual-studio-code-default)
     - [Claude Desktop optional](#claude-desktop-optional)
-    - [ChatGPT web only](#chatgpt-web-only)
+    - [ChatGPT](#chatgpt)
 - [Azure Provisioning optional](#azure-provisioning-optional)
     - [Configure Azure Integration for Aspire](#configure-azure-integration-for-aspire)
     - [Indexing the PDF Documents](#indexing-the-pdf-documents)
@@ -101,6 +101,23 @@ The following Aspire resources should be **Healthy**:
 - `mcp-inspector-entra-patcher` - Fixes a known issue with MCP Inspector that makes it incompatible with Entra ID-based OAuth flows
 - `hrm-documents-storage` - Azure blob storage (with PDFs pre-baked)
 
+There are more commands you can run:
+
+```sh
+# Run a Protected MCP server locally (requires Entra ID)
+aspire run --EnableMcpAuth=true
+
+# Deploy to Azure Container Apps (ACA)
+aspire deploy
+# Deploy a Protected MCP Server to ACA (requires Entra ID)
+aspire deploy --EnableMcpAuth=true
+
+# Clean up all Azure resources
+aspire do clean-az
+```
+
+These are detailed below in their respective sections.
+
 ## Using the MCP Inspector
 
 Aspire has provisioned the MCP Inspector (`mcp-inspector`) resource. Click the **Client** link in the Dashboard to connect to your MCP server!
@@ -144,17 +161,17 @@ In the course, Claude is used to demo the MCP server for STDIO and Streamable HT
 
 This is shown step-by-step in the course or you can [reference this guide by MCPBundles](https://www.mcpbundles.com/blog/claude-desktop-mcp#claude-desktop-mcp-config-file-location).
 
-### ChatGPT (web only)
-
-In order to use MCP servers with ChatGPT, you need to enable [Developer Mode](https://platform.openai.com/docs/guides/developer-mode).
+### ChatGPT
 
 > [!IMPORTANT]
 > This is only available on the **Web** and on paid plans.
 
-This requires you to deploy your MCP server, which you can find how to in the [Deploying the Project](#deploying-the-project) section.
+In order to use MCP servers with ChatGPT, you need to enable [Developer Mode](https://platform.openai.com/docs/guides/developer-mode) from the website.
+
+This requires you to deploy your MCP server in **Anonymous Mode**, which you can find how to do in the [Deploying the Project](#deploying-to-azure-optional) section.
 
 > [!IMPORTANT]
-> `enableAuth` must be `false` in your Aspire project as Entra ID is only supported by Visual Studio Code's MCP integration. In the **Advanced** MCP course,
+> The MCP server must be anonymous. Entra ID is only supported by Visual Studio Code's MCP integration. In the **Advanced** MCP course,
 > we introduce an Auth Gateway that makes your OAuth-protected MCP server compatible with all MCP clients.
 
 ## Azure Provisioning (optional)
@@ -162,11 +179,15 @@ This requires you to deploy your MCP server, which you can find how to in the [D
 By default, Aspire will not provision any Azure infrastructure and authentication is disabled. This is the easiest way to run the course demos
 but some MCP tools that require Azure authentication, like `ask_about_policy` will be disabled. The rest will work locally!
 
-You can optionally enable Azure provisioning to try out Azure AI Search or deploy the entire project remotely to run on Azure.
+You can optionally enable Azure provisioning to try out Azure AI Search or deploy the entire project remotely to run on Azure Container Apps (ACA). This is Azure's managed Kubernetes environment.
+
+> [!NOTE]
+> Learn more about [how Aspire apps are deployed to Azure](https://aspire.dev/deployment/azure/aca-deployment-aspire-cli/). This feature is still in preview.
 
 ### Configure Azure Integration for Aspire
 
-The [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest) is required for Azure integration in Aspire.
+> [!IMPORTANT]
+> The [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest) is required for Azure integration in Aspire. Follow the installation guide before continuing.
 
 First, begin by logging into the Azure CLI:
 
@@ -193,7 +214,7 @@ Now run Aspire:
 aspire run
 ```
 
-When provided an Azure subscription ID and an Entra tenant ID, Aspire will provision the following resources:
+When provided an Azure subscription ID, Aspire will provision the following resources:
 
 - `hrm-search-service` - Azure AI Search Service
 - `hrm-foundry` - Azure AI Foundry
@@ -217,16 +238,23 @@ view the Search Indexer in the Azure portal for details.
 
 Aspire does not automatically teardown your provisioned Azure resources. While every effort has been made to use the Free SKUs for each resource, there may still be costs associated with keeping the resources provisioned.
 
-#### Automated Task
+#### Run Cleanup Task
 
-To delete all the resources Aspire provisions in Azure, run the following pipeline step:
+To delete all the resources Aspire provisions in Azure, run the following command:
 
 ```sh
+# Delete all Aspire-related Azure resources (requires confirmation)
 aspire do clean-az
+
+# Skip confirmation prompts
+aspire do clean-az -y
+aspire do clean-az --yes
 ```
 
 > [!NOTE]
-> Don't worry, you will be asked to confirm before it will delete any Azure resources.
+> By default, you will be asked to confirm before it will delete any Azure resources. 
+> 
+> **Be advised:** If you pass the `-y/--yes` CLI flag, it skips confirmation prompts.
 
 This command will:
 
@@ -236,6 +264,10 @@ This command will:
 1. Purge them, if found
 1. Clear deployment state of `Azure:Deployment:*` and `Azure:ResourceGroup` keys for `aspire deploy`
 1. Clear user secrets of `Azure:Deployment:*` and `Azure:ResourceGroup` keys for `aspire run`
+
+> [!TIP]
+> This is super useful if you need to setup/teardown frequently or just want to clean up all the resources
+> when you're done playing around with the demo.
 
 If you live in fear, you can do the steps manually with the `az` CLI -- but it will take longer!
 
@@ -378,9 +410,18 @@ At the end of this process, you will have several identifiers to add as paramete
 
 ### Enabling Authentication
 
-First, in the `appsettings.json` file, you can set `EnableMcpAuth: true` to enable the OAuth-protected MCP server.
+You can run with OAuth protection enabled using the `EnableMcpAuth` flag:
 
-Then, find your Azure tenant ID:
+```sh
+aspire run --EnableMcpAuth=true
+```
+
+> [!TIP]
+> You can also set the value to true in the `appsettings.json` file.
+
+Before you do though, you'll need to set up extra configuration.
+
+First, find your Azure tenant ID:
 
 ```sh
 az account show --query tenantId
@@ -395,7 +436,7 @@ Add a new user secret (or provide it in the Aspire dashboard):
 dotnet user-secrets set "Parameters:azureTenantId" "your-tenant-id" --project ./Globomantics.Demo.AppHost
 ```
 
-Before you can proceed, you will need to configure two Microsoft Entra app registrations.
+You will also need to configure two Microsoft Entra app registrations.
 
 ### HRM API Entra App Registration
 
@@ -470,7 +511,7 @@ Once you select the scope and add the permission, it will show up under the **AP
 You can manually set the user secrets using the `dotnet user-secrets` tool, or you can run Aspire:
 
 ```sh
-aspire run
+aspire run --EnableMcpAuth=true
 ```
 
 When you visit the Dashboard, at the top you will be asked to fill in some missing parameter values.
@@ -530,10 +571,10 @@ The project supports deploying to Microsoft Azure in two modes:
 - **Anonymous:** In this mode, the MCP server is anonymous and publicly accessible but you don't need Entra ID set up.
 - **Protected:** In this mode, the MCP server is protected by Entra ID but requires additional configuration.
 
-The **Anonymous** mode is when `EnableMcpAuth: false` in the `appsettings.json` file. This mode is useful if you just want to play with
+The **Anonymous** mode is when you run with the `--EnableMcpAuth=false` flag (the default). This mode is useful if you just want to play with
 the MCP server, but you should immediately clean it up after you're done or anonymous users could issue requests to the MCP server.
 
-The **Protected** mode is when `EnableMcpAuth: true` in the `appsettings.json` file. This mode is the most robust and showcases how
+The **Protected** mode is when you run with the `--EnableMcpAuth=true` flag. This mode is the most robust and showcases how
 you can protect a MCP server in production. However, it is also the **most complex** to set up. You must complete the prerequisite steps
 in the [Entra ID Setup](#enabling-authentication) section first before deploying in this mode. 
 
