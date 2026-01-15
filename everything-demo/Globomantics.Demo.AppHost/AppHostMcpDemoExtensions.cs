@@ -129,6 +129,16 @@ public static class AppHostMcpDemoExtensions
         return builder;
     }
 
+    public static IDistributedApplicationBuilder AddCleanAzureNoopStep(this IDistributedApplicationBuilder builder)
+    {
+        builder.Pipeline.AddStep("clean-az", async (context) =>
+        {
+            context.Logger.LogWarning("No Azure subscription has been set. Make sure to follow the README to set Azure:SubscriptionId and other parameters.");
+        });
+
+        return builder;
+    }
+
     public static IDistributedApplicationBuilder AddCleanAzureResourcesStep(this IDistributedApplicationBuilder builder)
     {
         builder.Pipeline.AddStep("clean-az", async (context) =>
@@ -286,10 +296,31 @@ public static class AppHostMcpDemoExtensions
         this IDistributedApplicationBuilder builder,
         TokenCredential azureCredential,
         IResourceBuilder<AzureFunctionsProjectResource> mcp,
+        IResourceBuilder<AzureFunctionsProjectResource> api,
         IResourceBuilder<AzureStorageResource> hrmDocumentStorage,
         IResourceBuilder<AzureBlobStorageContainerResource> hrmDocumentBlobs)
     {
         var acaEnv = builder.AddAzureContainerAppEnvironment("aca-env");
+
+        // Configure host storage when running in publish mode
+        // to avoid triggering role assignment check normally
+        if (builder.ExecutionContext.IsPublishMode) {
+            api
+                .WithHostStorage(hrmDocumentStorage)
+                .WithRoleAssignments(hrmDocumentStorage,
+                    StorageBuiltInRole.StorageAccountContributor,
+                    StorageBuiltInRole.StorageBlobDataContributor,
+                    StorageBuiltInRole.StorageTableDataContributor,
+                    StorageBuiltInRole.StorageQueueDataContributor);
+
+            mcp
+                .WithHostStorage(hrmDocumentStorage)
+                .WithRoleAssignments(hrmDocumentStorage,
+                    StorageBuiltInRole.StorageAccountContributor,
+                    StorageBuiltInRole.StorageBlobDataContributor,
+                    StorageBuiltInRole.StorageTableDataContributor,
+                    StorageBuiltInRole.StorageQueueDataContributor);
+        }
 
         var aiSearch = builder.AddAzureSearch("hrm-search-service")
             .WithRunIndexerCommand(azureCredential)

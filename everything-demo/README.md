@@ -385,6 +385,18 @@ When using `aspire run` or `aspire deploy` with an Azure subscription set, you m
 This means you [deleted the AI Foundry resource](#deleting-and-cleaning-up-resources) but forgot to _purge_ it. Follow the steps in that section
 to ensure the AI Foundry resource is purged before re-running Aspire.
 
+#### When running `clean-az`, AppHost crashes
+
+When trying to run `aspire do clean-az`, you may see the following error:
+
+> The application model does not support role assignments. 
+> Ensure you are using an environment that supports role assignments, for example AddAzureContainerAppEnvironment.
+
+This error will occur if you don't have [an Azure subscription set](#deploying-to-azure-optional).
+
+> [!NOTE]
+> You may need to execute the `aspire run` command once after setting your Azure subscription for the Aspire provisioning state to be updated.
+
 ## Protect the MCP Server with Entra ID (optional)
 
 The course features a protected MCP server via OAuth using Microsoft Entra ID as the Authorization Server (AS), also called an Identity Provider (IdP).

@@ -15,7 +15,7 @@ using Projects;
 var azureCredential = new DefaultAzureCredential();
 var builder = DistributedApplication.CreateBuilder(args);
 
-var hasAzureSubscriptionSet = !string.IsNullOrWhiteSpace(builder.Configuration.GetValue<string>("Azure:SubscriptionId"));
+var enableAzureMode = builder.Configuration.GetValue("EnableAzure", false);
 var enableMcpAuth = builder.Configuration.GetValue("EnableMcpAuth", false);
 
 var hrmDocumentStorage = builder.AddAzureStorage("hrm-documents-storage")
@@ -34,12 +34,6 @@ var hrmDocumentStorage = builder.AddAzureStorage("hrm-documents-storage")
 var api = builder.AddAzureFunctionsProject<Globomantics_Hrm_Api>("hrm-api")
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.ExecutionContext.IsPublishMode ? "Production" : "Development")
     .WithEnvironment("API_ENABLE_AUTH", enableMcpAuth.ToString())
-    .WithHostStorage(hrmDocumentStorage)
-    .WithRoleAssignments(hrmDocumentStorage,
-        StorageBuiltInRole.StorageAccountContributor,
-        StorageBuiltInRole.StorageBlobDataContributor,
-        StorageBuiltInRole.StorageTableDataContributor,
-        StorageBuiltInRole.StorageQueueDataContributor)
     .WithExternalHttpEndpoints();
 
 var hrmDocumentBlobs = hrmDocumentStorage
@@ -54,12 +48,6 @@ var mcp = builder.AddAzureFunctionsProject<Globomantics_Mcp_Server>("mcp")
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.ExecutionContext.IsPublishMode ? "Production" : "Development")
     .WithEnvironment("MCP_ENABLE_AUTH", enableMcpAuth.ToString())
     .WithExternalHttpEndpoints()
-    .WithHostStorage(hrmDocumentStorage)
-    .WithRoleAssignments(hrmDocumentStorage,
-        StorageBuiltInRole.StorageAccountContributor,
-        StorageBuiltInRole.StorageBlobDataContributor,
-        StorageBuiltInRole.StorageTableDataContributor,
-        StorageBuiltInRole.StorageQueueDataContributor)
     .WithReference(hrmDocumentBlobs)
     .WithReference(api)
     .WaitFor(api)
@@ -69,7 +57,7 @@ var mcp = builder.AddAzureFunctionsProject<Globomantics_Mcp_Server>("mcp")
     {
         var interactionService = e.Services.GetRequiredService<IInteractionService>()!;
 
-        if (!hasAzureSubscriptionSet)
+        if (!enableAzureMode)
         {
             _ = interactionService.PromptNotificationAsync(
                 title: "Information",
@@ -101,18 +89,20 @@ if (enableMcpAuth)
     builder.AddAuthMcpDemoResources(mcp, api);
 }
 
-if (hasAzureSubscriptionSet)
+if (enableAzureMode)
 {
     builder
         .AddAzureDemoResources(
             azureCredential,
             mcp,
+            api,
             hrmDocumentStorage,
             hrmDocumentBlobs)
         .AddCleanAzureResourcesStep();
 }
 else
 {
+    builder.AddCleanAzureNoopStep();
     hrmDocumentStorage.RunAsEmulator();
 }
 
