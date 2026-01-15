@@ -6,7 +6,7 @@
         },
         "globomantics-mcp-server-remote": {
             "type": "http",
-            "url": "https://endpoint.azurewebsites.net"
+            "url": "https://mcp.ENVIRONMENT.eastus.azurecontainerapps.io"
         }
     }
 }

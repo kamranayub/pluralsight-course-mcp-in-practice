@@ -11,11 +11,12 @@ This is the full course demo project. It uses [Aspire](https://aspire.dev), a cr
     - [Visual Studio Code default](#visual-studio-code-default)
     - [Claude Desktop optional](#claude-desktop-optional)
     - [ChatGPT](#chatgpt)
+    - [MCP Client Compatibility with Entra ID](#mcp-client-compatibility-with-entra-id)
 - [Azure Provisioning optional](#azure-provisioning-optional)
     - [Configure Azure Integration for Aspire](#configure-azure-integration-for-aspire)
     - [Indexing the PDF Documents](#indexing-the-pdf-documents)
     - [Deleting and Cleaning Up Resources](#deleting-and-cleaning-up-resources)
-    - [Troubleshooting](#troubleshooting)
+    - [Azure Troubleshooting](#azure-troubleshooting)
 - [Protect the MCP Server with Entra ID optional](#protect-the-mcp-server-with-entra-id-optional)
     - [Enabling Authentication](#enabling-authentication)
     - [HRM API Entra App Registration](#hrm-api-entra-app-registration)
@@ -23,12 +24,13 @@ This is the full course demo project. It uses [Aspire](https://aspire.dev), a cr
     - [Provide the Entra Parameters to Aspire](#provide-the-entra-parameters-to-aspire)
     - [Testing the Auth Flow](#testing-the-auth-flow)
     - [Compatibility Issues with MCP Clients and Microsoft Entra](#compatibility-issues-with-mcp-clients-and-microsoft-entra)
-    - [Troubleshooting](#troubleshooting)
+    - [Authentication Troubleshooting](#authentication-troubleshooting)
 - [Deploying to Azure optional](#deploying-to-azure-optional)
     - [Preparing the Deployment](#preparing-the-deployment)
+    - [Connecting to the Remote MCP Server](#connecting-to-the-remote-mcp-server)
     - [Testing with MCP Inspector](#testing-with-mcp-inspector)
     - [Custom Pipeline Deployment Steps](#custom-pipeline-deployment-steps)
-    - [Troubleshooting](#troubleshooting)
+    - [Deployment Troubleshooting](#deployment-troubleshooting)
 - [Aspire Architecture](#aspire-architecture)
     - [HRM API](#hrm-api)
     - [MCP Server](#mcp-server)
@@ -110,9 +112,9 @@ aspire run --EnableMcpAuth=true
 # Run an Anonymous MCP server locally with provisioned Azure resources (AI Search)
 aspire run --EnableAzure=true
 
-# Deploy to Azure Container Apps (ACA)
+# Deploy an Anonymous MCP server to Azure Container Apps (ACA)
 aspire deploy
-# Deploy a Protected MCP Server to ACA (requires Entra ID)
+# Deploy a Protected MCP server to ACA (requires Entra ID)
 aspire deploy --EnableMcpAuth=true
 
 # Clean up all Azure resources
@@ -173,9 +175,14 @@ In order to use MCP servers with ChatGPT, you need to enable [Developer Mode](ht
 
 This requires you to deploy your MCP server in **Anonymous Mode**, which you can find how to do in the [Deploying the Project](#deploying-to-azure-optional) section.
 
-> [!IMPORTANT]
-> The MCP server must be anonymous. Entra ID is only supported by Visual Studio Code's MCP integration. In the **Advanced** MCP course,
-> we introduce an Auth Gateway that makes your OAuth-protected MCP server compatible with all MCP clients.
+### MCP Client Compatibility with Entra ID
+
+**For all clients except VS Code**, the MCP server must be anonymous. Entra ID is only supported by Visual Studio Code's MCP integration. 
+
+See the [Entra compatibility section](#compatibility-issues-with-mcp-clients-and-microsoft-entra) for details.
+
+> [!TIP]
+> In the [Advanced MCP course](https://github.com/kamranayub/pluralsight-course-mcp-advanced), we introduce an Auth Gateway that makes your OAuth-protected MCP server compatible with all MCP clients.
 
 ## Azure Provisioning (optional)
 
@@ -225,7 +232,7 @@ When the flag is enabled, Aspire will provision the following resources in Azure
 
 > [!TIP]
 > You can also set `EnableAzure` to `true` in the `Globomantics.Demo.AppHost/appsettings.json` file.
-> This will apply to all `aspire run`, `aspire deploy`, and `aspire do` commands.
+> This will apply to every `aspire run` command.
 
 ### Indexing the PDF Documents
 
@@ -333,7 +340,7 @@ Delete the following keys:
 > [!NOTE]
 > You could also use `dotnet user-secrets clear` command but this will clear ALL secrets, including the Azure subcription secrets. You will need to re-add the secrets if you do this.
 
-### Troubleshooting
+### Azure Troubleshooting
 
 #### The access token is from the wrong issuer
 
@@ -561,7 +568,7 @@ For all other MCP clients, your protected MCP server **will not be compatible.**
 
 To support other MCP clients, see the [Advanced MCP course](https://github.com/kamranayub/pluralsight-course-mcp-advanced) where we introduce an MCP Authentication Gateway. This federates authentication so that Microsoft Entra is no longer the front door for MCP clients, adds DCR support, and supports session-based token storage. This is also **more secure** as the MCP clients never see Entra ID authentication tokens and instead only are provided session-based "reference" tokens.
 
-### Troubleshooting
+### Authentication Troubleshooting
 
 #### The redirect URI specified in the request does not match
 
@@ -673,7 +680,7 @@ The pipeline logs will display the Aspire Dashboard and MCP server URLs like thi
 
 ```sh
 (print-dashboard-url-aca-env) ✓ Dashboard available at
-https://aspire-dashboard.ext.<ENVIRONMENT>.<LOCATION>.eastus.azurecontainerapps.io
+https://aspire-dashboard.ext.<ENVIRONMENT>.<LOCATION>.azurecontainerapps.io
 
 (print-mcp-summary) i [INF] Successfully deployed mcp to
 https://mcp.<ENVIRONMENT>.<LOCATION>.azurecontainerapps.io
@@ -687,6 +694,32 @@ If you're signed in, you'll be redirected back and be greeted with a "Your Funct
 > [!IMPORTANT]
 >  _Revision_ ingress URLs are not automatically added as Web Redirect URIs in Entra. Only the primary ingress URL.
 
+### Connecting to the Remote MCP Server
+
+Follow the [connecting section](#connecting-to-the-mcp-server) above to connect to the remote MCP server
+in your client of choice. 
+
+Instead of the `localhost` URL, use the MCP server ingress URL:
+
+**Example mcp.json (VS Code)**:
+
+```json
+{
+    "servers": {
+        "globomantics-mcp-server-local": {            
+            "type": "http",
+            "url": "http://localhost:5000/"
+        },
+        "globomantics-mcp-server-remote": {
+            "type": "http",
+            "url": "https://mcp.<ENVIRONMENT>.<LOCATION>.azurecontainerapps.io"
+        }
+    }
+}
+```
+
+> [!IMPORTANT]
+> The same MCP client compatibility restrictions exist when the remote MCP server is [protected by Entra ID](#enabling-authentication).
 
 ### Testing with MCP Inspector
 
@@ -773,7 +806,20 @@ provisioned Azure Storage blob container.
 
 This is to enable the Azure AI Search indexer to index the documents into the vector database.
 
-### Troubleshooting
+### Deployment Troubleshooting
+
+#### Deployment fails with container runtime error
+
+You must have a OCI-compliant container runtime installed, see the [Aspire Prerequisites](https://aspire.dev/get-started/prerequisites/).
+
+Docker is supported by default. If you are using an alternative such as Podman, update your Aspire configuration:
+
+```sh
+export ASPIRE_CONTAINER_RUNTIME=podman
+```
+
+> [!TIP]
+> You can set this in your shell profile to apply to all `aspire deploy` runs.
 
 #### Deployment fails after deleting production resources
 
