@@ -129,16 +129,6 @@ public static class AppHostMcpDemoExtensions
         return builder;
     }
 
-    public static IDistributedApplicationBuilder AddCleanAzureNoopStep(this IDistributedApplicationBuilder builder)
-    {
-        builder.Pipeline.AddStep("clean-az", async (context) =>
-        {
-            context.Logger.LogWarning("No Azure subscription has been set. Make sure to follow the README to set Azure:SubscriptionId and other parameters.");
-        });
-
-        return builder;
-    }
-
     public static IDistributedApplicationBuilder AddCleanAzureResourcesStep(this IDistributedApplicationBuilder builder)
     {
         builder.Pipeline.AddStep("clean-az", async (context) =>

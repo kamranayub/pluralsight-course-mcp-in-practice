@@ -15,7 +15,7 @@ using Projects;
 var azureCredential = new DefaultAzureCredential();
 var builder = DistributedApplication.CreateBuilder(args);
 
-var enableAzureMode = builder.Configuration.GetValue("EnableAzure", false);
+var enableAzureMode = builder.Configuration.GetValue("EnableAzure", false) || builder.ExecutionContext.IsPublishMode;
 var enableMcpAuth = builder.Configuration.GetValue("EnableMcpAuth", false);
 
 var hrmDocumentStorage = builder.AddAzureStorage("hrm-documents-storage")
@@ -102,7 +102,6 @@ if (enableAzureMode)
 }
 else
 {
-    builder.AddCleanAzureNoopStep();
     hrmDocumentStorage.RunAsEmulator();
 }
 

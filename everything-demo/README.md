@@ -107,6 +107,9 @@ There are more commands you can run:
 # Run a Protected MCP server locally (requires Entra ID)
 aspire run --EnableMcpAuth=true
 
+# Run an Anonymous MCP server locally with provisioned Azure resources (AI Search)
+aspire run --EnableAzure=true
+
 # Deploy to Azure Container Apps (ACA)
 aspire deploy
 # Deploy a Protected MCP Server to ACA (requires Entra ID)
@@ -208,17 +211,21 @@ dotnet user-secrets set "Azure:Location" "eastus" --project ./Globomantics.Demo.
 dotnet user-secrets set "Azure:CredentialSource" "AzureCli" --project ./Globomantics.Demo.AppHost
 ```
 
-Now run Aspire:
+Now run Aspire with the `EnableAzure=true` flag turned on:
 
 ```sh
-aspire run
+aspire run --EnableAzure=true
 ```
 
-When provided an Azure subscription ID, Aspire will provision the following resources:
+When the flag is enabled, Aspire will provision the following resources in Azure:
 
 - `hrm-search-service` - Azure AI Search Service
 - `hrm-foundry` - Azure AI Foundry
 - `hrm-embeddings` - Foundry-deployed OpenAI model for text-embedding-ada-002
+
+> [!TIP]
+> You can also set `EnableAzure` to `true` in the `Globomantics.Demo.AppHost/appsettings.json` file.
+> This will apply to all `aspire run`, `aspire deploy`, and `aspire do` commands.
 
 ### Indexing the PDF Documents
 
@@ -269,6 +276,9 @@ This command will:
 > This is super useful if you need to setup/teardown frequently or just want to clean up all the resources
 > when you're done playing around with the demo.
 
+> [!IMPORTANT]
+> When running `aspire do clean-az`, you don't need to pass `--EnableAzure=true` as that is implied.
+
 If you live in fear, you can do the steps manually with the `az` CLI -- but it will take longer!
 
 #### Manual Steps: Deleting Resources
@@ -317,7 +327,7 @@ The user secrets ID is in the `Globomantics.Demo.AppHost\Globomantics.Demo.AppHo
 
 Delete the following keys:
 
-- `Azure:Deployment:*` -- These store metadata about the provisioned resources
+- `Azure:Deployments:*` -- These store metadata about the provisioned resources
 - `Azure:ResourceGroup` -- This is the provisioned resource group name
 
 > [!NOTE]
@@ -385,18 +395,6 @@ When using `aspire run` or `aspire deploy` with an Azure subscription set, you m
 This means you [deleted the AI Foundry resource](#deleting-and-cleaning-up-resources) but forgot to _purge_ it. Follow the steps in that section
 to ensure the AI Foundry resource is purged before re-running Aspire.
 
-#### When running `clean-az`, AppHost crashes
-
-When trying to run `aspire do clean-az`, you may see the following error:
-
-> The application model does not support role assignments. 
-> Ensure you are using an environment that supports role assignments, for example AddAzureContainerAppEnvironment.
-
-This error will occur if you don't have [an Azure subscription set](#deploying-to-azure-optional).
-
-> [!NOTE]
-> You may need to execute the `aspire run` command once after setting your Azure subscription for the Aspire provisioning state to be updated.
-
 ## Protect the MCP Server with Entra ID (optional)
 
 The course features a protected MCP server via OAuth using Microsoft Entra ID as the Authorization Server (AS), also called an Identity Provider (IdP).
@@ -429,7 +427,8 @@ aspire run --EnableMcpAuth=true
 ```
 
 > [!TIP]
-> You can also set the value to true in the `appsettings.json` file.
+> You can also set `EnableMcpAuth` to `true` in the `Globomantics.Demo.AppHost/appsettings.json` file.
+> This will apply to all `aspire run`, `aspire deploy`, and `aspire do` commands.
 
 Before you do though, you'll need to set up extra configuration.
 
@@ -610,6 +609,9 @@ Once the existing resources have been cleaned up, run the Aspire deployment comm
 ```sh
 aspire deploy
 ```
+
+> [!IMPORTANT]
+> When running `aspire deploy`, you don't need to pass `--EnableAzure=true` as that is implied.
 
 **If you are deploying in Protected mode,** Aspire will ask you to provide the Entra secrets and configuration parameters:
 
