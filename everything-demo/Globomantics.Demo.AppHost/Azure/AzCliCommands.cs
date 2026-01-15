@@ -72,37 +72,42 @@ internal static class AzCliCommands
             "--query", "[?tags.aspire=='true'].{name: name}",
             "-o", "tsv"
         ).ConfigureAwait(false);
-        
+
         return [.. resourceGroups.Split("\n", StringSplitOptions.RemoveEmptyEntries).Select(r => r.Trim())];
     }
 
-    public static async Task DeleteResourceGroup(string resourceGroupName, PipelineStepContext ctx)
+    public static async Task DeleteResourceGroup(string resourceGroupName, bool noWait, PipelineStepContext ctx)
     {
         await RunAzCliCommand(ctx,
             "group", "delete",
             "--name", resourceGroupName,
+            noWait ? "--no-wait" : "",
             "--yes"
         ).ConfigureAwait(false);
     }
 
     public static async Task<string[]> GetSoftDeletedFoundryAccounts(string foundryResourceName, PipelineStepContext ctx)
     {
-        var deletedFoundryAccounts =  await RunAzCliCommand(ctx,
+        var deletedFoundryAccounts = await RunAzCliCommand(ctx,
             "cognitiveservices", "account", "list-deleted",
             "--query", $"[?tags.\"aspire-resource-name\"=='{foundryResourceName}'].id",
             "-o", "tsv"
         ).ConfigureAwait(false);
 
-        return deletedFoundryAccounts.Split(Environment.NewLine, 
+        return deletedFoundryAccounts.Split(Environment.NewLine,
             StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
     }
 
-    public static async Task DeleteAzResourceByIds(string[] resourceIds, PipelineStepContext ctx)
+    public static async Task DeleteAzResourceByIds(string[] resourceIds, bool noWait, PipelineStepContext ctx)
     {
         List<string> args = ["resource", "delete", "--ids"];
         args.AddRange(resourceIds);
-        args.Add("--no-wait");
 
+        if (noWait)
+        {
+            args.Add("--no-wait");
+        }
+        
         await RunAzCliCommand(ctx, [.. args]).ConfigureAwait(false);
     }
 
@@ -121,7 +126,8 @@ internal static class AzCliCommands
     {
         using var azProcess = Process.Start(CreateAzStartInfo(args)) ?? throw new InvalidOperationException("Failed to start az CLI process");
 
-        if (ctx.Logger.IsEnabled(LogLevel.Debug)) {
+        if (ctx.Logger.IsEnabled(LogLevel.Debug))
+        {
             ctx.Logger.LogDebug("Launching process: {Process} {Args}", azProcess.StartInfo.FileName, string.Join(" ", azProcess.StartInfo.ArgumentList));
         }
 
@@ -133,7 +139,8 @@ internal static class AzCliCommands
         var stdout = await stdoutTask.ConfigureAwait(false);
         var stderr = await stderrTask.ConfigureAwait(false);
 
-        if (ctx.Logger.IsEnabled(LogLevel.Debug)) {
+        if (ctx.Logger.IsEnabled(LogLevel.Debug))
+        {
             stdout.Split(Environment.NewLine).ToList().ForEach(line => ctx.Logger.LogDebug("Az CLI STDOUT: {StdOut}", line));
             stderr.Split(Environment.NewLine).ToList().ForEach(line => ctx.Logger.LogDebug("Az CLI STDERR: {StdErr}", line));
         }
@@ -142,7 +149,7 @@ internal static class AzCliCommands
         {
             throw new InvalidOperationException(
                 $"az CLI process exited with code {azProcess.ExitCode}\nSTDOUT: {stdout}\nSTDERR: {stderr}");
-        }    
+        }
 
         return stdout.Trim();
     }

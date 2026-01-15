@@ -263,12 +263,21 @@ aspire do clean-az
 # Skip confirmation prompts
 aspire do clean-az -y
 aspire do clean-az --yes
+
+# Don't wait for deletions (faster, but may not purge AI Foundry accounts immediately)
+aspire do clean-az --no-wait
 ```
 
 > [!NOTE]
 > By default, you will be asked to confirm before it will delete any Azure resources. 
 > 
 > **Be advised:** If you pass the `-y/--yes` CLI flag, it skips confirmation prompts.
+
+> [!NOTE]
+> By default, the task will wait for resources to be deleted which can sometimes take upwards of 20 minutes.
+>
+> **Be advised:** If you pass `--no-wait`, it will be faster but if a resource group is deleted, the provisioned AI Foundry account
+> may not be deleted right away and you'll have to re-run `clean-az`.
 
 This command will:
 

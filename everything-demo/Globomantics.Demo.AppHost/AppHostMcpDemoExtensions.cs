@@ -136,6 +136,8 @@ public static class AppHostMcpDemoExtensions
             var confirmAutomatically = Environment.GetCommandLineArgs().Contains("--yes")
                 || Environment.GetCommandLineArgs().Contains("-y");
 
+            var noWait = Environment.GetCommandLineArgs().Contains("--no-wait");
+
             IReadOnlyList<InteractionInput> confirmInput = [
                 new () {
                     Name = "Confirm?",
@@ -147,6 +149,11 @@ public static class AppHostMcpDemoExtensions
             if (confirmAutomatically)
             {
                 context.Logger.LogWarning("Automatic confirmation enabled; skipping resource deletion prompts.");
+            }
+
+            if (noWait)
+            {
+                context.Logger.LogWarning("No Wait is enabled; AI Foundry accounts may not be purged.");
             }
 
             var requireConfirm = !confirmAutomatically;
@@ -204,7 +211,7 @@ public static class AppHostMcpDemoExtensions
                             }
                         }
 
-                        await AzCliCommands.DeleteResourceGroup(resourceGroupName, context).ConfigureAwait(false);
+                        await AzCliCommands.DeleteResourceGroup(resourceGroupName, noWait, context).ConfigureAwait(false);
                     }
                 }
             }
@@ -242,7 +249,12 @@ public static class AppHostMcpDemoExtensions
                         }
                     }
 
-                    await AzCliCommands.DeleteAzResourceByIds([.. resourceIdsToDelete], context).ConfigureAwait(false);
+                    if (resourceIdsToDelete.Count > 0)
+                    {
+                        context.Logger.LogInformation("Deleting resources: {Resources}", resourceIdsToDelete.Select(r => r.Split('/').Last()));
+
+                        await AzCliCommands.DeleteAzResourceByIds([.. resourceIdsToDelete], noWait, context).ConfigureAwait(false);
+                    }
                 }
             }
 
