@@ -116,27 +116,22 @@ else
     hrmDocumentStorage.RunAsEmulator();
 }
 
-var mcpEndpoint = mcp.GetEndpoint("http");
+var mcpPatcher = builder
+    .AddResource(new JavaScriptAppResource("mcp-inspector-entra-patch", "npx", ""))
+    .WithNpm(install: true)
+    .WithCommand("npm")
+    .WithArgs("run", "patch:mcp")
+    .ExcludeFromManifest();
 
-mcp.WithEnvironment("WEBSITE_HOSTNAME", ReferenceExpression.Create(
-    $"{mcpEndpoint.Property(EndpointProperty.Host)}:{mcpEndpoint.Property(EndpointProperty.Port)}"));
-
-// MCP Inspector only works in Run mode and is not meant to be published
-if (builder.ExecutionContext.IsRunMode)
+var mcpInspector = builder.AddMcpInspector("mcp-inspector", options =>
 {
-    var mcpPatcher = builder
-        .AddResource(new JavaScriptAppResource("mcp-inspector-entra-patch", "npx", ""))
-        .WithNpm(install: true)
-        .WithCommand("npm")
-        .WithArgs("run", "patch:mcp");
+    options.InspectorVersion = "0.18.0";
+})
+    .WithMcpServer(mcp, path: "/")
+    .WaitForCompletion(mcpPatcher)
+    .ExcludeFromManifest();
 
-    var mcpInspector = builder.AddMcpInspector("mcp-inspector", options =>
-    {
-        options.InspectorVersion = "0.18.0";
-    })
-        .WithMcpServer(mcp, path: "/")
-        .WaitForCompletion(mcpPatcher);
-
+if (builder.ExecutionContext.IsRunMode) {
     mcp.WithReference(mcpInspector);
 }
 

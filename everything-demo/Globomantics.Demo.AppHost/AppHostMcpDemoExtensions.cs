@@ -160,6 +160,8 @@ public static class AppHostMcpDemoExtensions
 
                 try
                 {
+                    context.Logger.LogInformation("Checking for Aspire-tagged resource groups...");
+
                     var resourceGroupNames = await AzCliCommands.GetAspireResourceGroups(context.CancellationToken).ConfigureAwait(false);
 
                     if (resourceGroupNames.Length > 0)
@@ -213,16 +215,20 @@ public static class AppHostMcpDemoExtensions
 
                     var deploymentStateManager = context.Services.GetRequiredService<IDeploymentStateManager>();
                     var azureDeploymentConfig = await deploymentStateManager.AcquireSectionAsync("Azure");
-
+                    var copyOfState = new JsonObject();
+                    
                     foreach (var azDeploymentState in azureDeploymentConfig.Data)
                     {
-                        if (azDeploymentState.Key.StartsWith("Deployments:") || azDeploymentState.Key == "ResourceGroup")
+                        if (azDeploymentState.Key == "Deployments" || azDeploymentState.Key == "ResourceGroup")
                         {
-                            azureDeploymentConfig.Data[azDeploymentState.Key] = null;
+                            continue;
                         }
+
+                        copyOfState[azDeploymentState.Key] = azDeploymentState.Value?.DeepClone();
                     }
 
-                    await deploymentStateManager.SaveSectionAsync(azureDeploymentConfig).ConfigureAwait(false);
+                    await deploymentStateManager.SaveSectionAsync(
+                        new DeploymentStateSection("Azure", copyOfState, azureDeploymentConfig.Version)).ConfigureAwait(false);
 
                     context.Logger.LogInformation("Deleted Azure deployment state");
 
@@ -259,14 +265,14 @@ public static class AppHostMcpDemoExtensions
                     }
 
                     await cleanResourcesTask.CompleteAsync(
-                        $"Successfully cleaned up Aspire resource groups",
+                        $"Successfully cleaned up Aspire resources",
                         CompletionState.Completed,
                         context.CancellationToken).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
                     await cleanResourcesTask.CompleteAsync(
-                        $"Error cleaning up Aspire resource groups: {ex.Message}",
+                        $"Error cleaning up Aspire resources: {ex.Message}",
                         CompletionState.CompletedWithError,
                         context.CancellationToken).ConfigureAwait(false);
                 }
