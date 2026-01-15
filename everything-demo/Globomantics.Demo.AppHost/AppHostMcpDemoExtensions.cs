@@ -1,6 +1,7 @@
 #pragma warning disable ASPIREPIPELINES001
 #pragma warning disable ASPIREPIPELINES002
 #pragma warning disable ASPIREUSERSECRETS001
+#pragma warning disable ASPIREINTERACTION001
 
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -131,6 +132,8 @@ public static class AppHostMcpDemoExtensions
 
         builder.Pipeline.AddStep("clean-az", async (context) =>
         {
+            var interaction = context.Services.GetRequiredService<IInteractionService>();
+
             var cleanResourcesTask = await context.ReportingStep
                     .CreateTaskAsync($"Cleaning up Azure-provisioned Aspire resources...", context.CancellationToken)
                     .ConfigureAwait(false);
@@ -148,6 +151,24 @@ public static class AppHostMcpDemoExtensions
                         foreach (var resourceGroupName in resourceGroupNames)
                         {
                             context.Logger.LogInformation("Deleting resource group {ResourceGroupName}...", resourceGroupName);
+
+                            if (interaction.IsAvailable)
+                            {
+                                var shouldDelete = await interaction.PromptInputsAsync(
+                                    "Confirm Deletion", $"Deleting resource group {resourceGroupName}",
+                                    cancellationToken: context.CancellationToken,
+                                    inputs: [
+                                        new() {
+                                            Name = "Confirm?",
+                                            Required = true,
+                                            InputType = InputType.Boolean
+                                        }
+                                    ]).ConfigureAwait(false);
+
+                                if (shouldDelete.Canceled || bool.Parse(shouldDelete.Data[0].Value ?? "false") is false) {
+                                    continue;
+                                }
+                            }
 
                             await DeleteResourceGroup(resourceGroupName, context.CancellationToken).ConfigureAwait(false);
                         }
@@ -169,6 +190,24 @@ public static class AppHostMcpDemoExtensions
 
                             foreach (var foundryResourceId in softDeletedFoundryAccounts)
                             {
+                                if (interaction.IsAvailable)
+                                {
+                                    var shouldDelete = await interaction.PromptInputsAsync(
+                                        "Confirm Deletion", $"Deleting AI Foundry resource: {foundryResourceId}", 
+                                        cancellationToken: context.CancellationToken,
+                                        inputs: [
+                                            new() {
+                                                Name = "Confirm?",
+                                                Required = true,
+                                                InputType = InputType.Boolean
+                                            }
+                                        ]).ConfigureAwait(false);
+
+                                    if (shouldDelete.Canceled || bool.Parse(shouldDelete.Data[0].Value ?? "false") is false) {
+                                        continue;
+                                    }
+                                }
+
                                 context.Logger.LogInformation("Purging Foundry account {FoundryAccountName}...", foundryResourceId);
 
                                 await DeleteAzResourceById(foundryResourceId, context.CancellationToken).ConfigureAwait(false);

@@ -225,6 +225,9 @@ To delete all the resources Aspire provisions in Azure, run the following pipeli
 aspire do clean-az
 ```
 
+> [!NOTE]
+> Don't worry, you will be asked to confirm before it will delete any Azure resources.
+
 This command will:
 
 1. Search for any resource groups in your subscription tagged with `aspire: true` 
@@ -233,10 +236,6 @@ This command will:
 1. Purge them, if found
 1. Clear deployment state of `Azure:Deployment:*` and `Azure:ResourceGroup` keys for `aspire deploy`
 1. Clear user secrets of `Azure:Deployment:*` and `Azure:ResourceGroup` keys for `aspire run`
-
-> ![IMPORTANT]
-> This command will not ask for confirmation but will log each resource it deletes. It also
-> filters resources to Aspire-related resources only.
 
 If you live in fear, you can do the steps manually with the `az` CLI -- but it will take longer!
 
