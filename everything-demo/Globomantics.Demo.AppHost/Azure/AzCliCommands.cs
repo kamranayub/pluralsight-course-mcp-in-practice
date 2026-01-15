@@ -97,13 +97,13 @@ internal static class AzCliCommands
             StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
     }
 
-    public static async Task DeleteAzResourceById(string resourceId, PipelineStepContext ctx)
+    public static async Task DeleteAzResourceByIds(string[] resourceIds, PipelineStepContext ctx)
     {
-        await RunAzCliCommand(ctx,
-            "resource", "delete",
-            "--ids", resourceId,
-            "--no-wait"
-        ).ConfigureAwait(false);
+        List<string> args = ["resource", "delete", "--ids"];
+        args.AddRange(resourceIds);
+        args.Add("--no-wait");
+
+        await RunAzCliCommand(ctx, [.. args]).ConfigureAwait(false);
     }
 
     public static async Task<Guid?> GetSignedInUserPrincipalId(PipelineStepContext ctx)

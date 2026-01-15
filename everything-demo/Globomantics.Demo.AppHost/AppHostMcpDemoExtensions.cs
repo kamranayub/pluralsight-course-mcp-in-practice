@@ -136,6 +136,14 @@ public static class AppHostMcpDemoExtensions
             var confirmAutomatically = Environment.GetCommandLineArgs().Contains("--yes")
                 || Environment.GetCommandLineArgs().Contains("-y");
 
+            IReadOnlyList<InteractionInput> confirmInput = [
+                new () {
+                    Name = "Confirm?",
+                    Required = true,
+                    InputType = InputType.Boolean
+                }
+            ];
+
             if (confirmAutomatically)
             {
                 context.Logger.LogWarning("Automatic confirmation enabled; skipping resource deletion prompts.");
@@ -150,124 +158,12 @@ public static class AppHostMcpDemoExtensions
 
             await using (cleanResourcesTask.ConfigureAwait(false))
             {
-                IReadOnlyList<InteractionInput> confirmInput = [
-                    new () {
-                        Name = "Confirm?",
-                        Required = true,
-                        InputType = InputType.Boolean
-                    }
-                ];
-
                 try
                 {
-                    context.Logger.LogInformation("Checking for Aspire-tagged resource groups...");
-
-                    var resourceGroupNames = await AzCliCommands.GetAspireResourceGroups(context).ConfigureAwait(false);
-
-                    if (resourceGroupNames.Length > 0)
-                    {
-                        foreach (var resourceGroupName in resourceGroupNames)
-                        {
-                            context.Logger.LogInformation("Deleting resource group {ResourceGroupName}...", resourceGroupName);
-
-                            if (requireConfirm && interaction.IsAvailable)
-                            {
-                                var shouldDelete = await interaction.PromptInputsAsync(
-                                    "Confirm Deletion", $"Deleting resource group {resourceGroupName}",
-                                    cancellationToken: context.CancellationToken,
-                                    inputs: confirmInput).ConfigureAwait(false);
-
-                                if (shouldDelete.Canceled || bool.Parse(shouldDelete.Data[0].Value ?? "false") is false)
-                                {
-                                    continue;
-                                }
-                            }
-
-                            await AzCliCommands.DeleteResourceGroup(resourceGroupName, context).ConfigureAwait(false);
-                        }
-                    }
-
-                    var foundryResources = context.Model.Resources
-                        .OfType<AzureAIFoundryResource>();
-
-                    foreach (var foundryResource in foundryResources)
-                    {
-                        context.Logger.LogInformation("Checking whether {FoundryAccountName} is soft-deleted...", foundryResource.Name);
-
-                        var foundryResourceIds = await AzCliCommands.GetSoftDeletedFoundryAccounts(foundryResource.Name, context).ConfigureAwait(false);
-
-                        if (foundryResourceIds.Length > 0)
-                        {
-                            foreach (var resourceId in foundryResourceIds)
-                            {
-                                if (requireConfirm && interaction.IsAvailable)
-                                {
-                                    var shouldDelete = await interaction.PromptInputsAsync(
-                                        "Confirm Deletion", $"Deleting AI Foundry resource: {resourceId}",
-                                        cancellationToken: context.CancellationToken,
-                                        inputs: confirmInput).ConfigureAwait(false);
-
-                                    if (bool.Parse(shouldDelete.Data?[0].Value ?? "false") is false)
-                                    {
-                                        continue;
-                                    }
-                                }
-
-                                await AzCliCommands.DeleteAzResourceById(resourceId, context).ConfigureAwait(false);
-                            }
-                        }
-                    }
-
-                    var deploymentStateManager = context.Services.GetRequiredService<IDeploymentStateManager>();
-                    var azureDeploymentConfig = await deploymentStateManager.AcquireSectionAsync("Azure");
-                    var copyOfState = new JsonObject();
-
-                    foreach (var azDeploymentState in azureDeploymentConfig.Data)
-                    {
-                        if (azDeploymentState.Key == "Deployments" || azDeploymentState.Key == "ResourceGroup")
-                        {
-                            continue;
-                        }
-
-                        copyOfState[azDeploymentState.Key] = azDeploymentState.Value?.DeepClone();
-                    }
-
-                    await deploymentStateManager.SaveSectionAsync(
-                        new DeploymentStateSection("Azure", copyOfState, azureDeploymentConfig.Version)).ConfigureAwait(false);
-
-                    context.Logger.LogInformation("Deleted Azure deployment state");
-
-                    var userSecretsManager = context.Services.GetService<IUserSecretsManager>();
-
-                    if (userSecretsManager?.FilePath != null && File.Exists(userSecretsManager.FilePath))
-                    {
-                        var secretFileContents = await File.ReadAllTextAsync(
-                            userSecretsManager.FilePath,
-                            context.CancellationToken).ConfigureAwait(false);
-
-                        JsonNode rootNode = JsonNode.Parse(secretFileContents)!;
-
-                        if (rootNode is JsonObject rootObject)
-                        {
-                            foreach (var secret in rootObject.DeepClone().AsObject())
-                            {
-                                if (secret.Key.StartsWith("Azure:Deployments:") || secret.Key == "Azure:ResourceGroup")
-                                {
-                                    rootObject.Remove(secret.Key);
-                                }
-                            }
-
-                            var updatedSecretFileContents = rootObject.ToJsonString(
-                                new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
-
-                            await File.WriteAllTextAsync(
-                                userSecretsManager.FilePath,
-                            updatedSecretFileContents,
-                            context.CancellationToken).ConfigureAwait(false);
-
-                            context.Logger.LogInformation("Deleted Azure deployment state from user secrets");
-                        }
-                    }
+                    await DeleteResourceGroups();
+                    await DeleteFoundryResources();
+                    await DeleteAzureDeploymentState();
+                    await DeleteAzureUserSecrets();
 
                     await cleanResourcesTask.CompleteAsync(
                         $"Successfully cleaned up Aspire resources",
@@ -280,6 +176,130 @@ public static class AppHostMcpDemoExtensions
                         $"Error cleaning up Aspire resources: {ex.Message}",
                         CompletionState.CompletedWithError,
                         context.CancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            async Task DeleteResourceGroups()
+            {
+                context.Logger.LogInformation("Checking for Aspire-tagged resource groups...");
+
+                var resourceGroupNames = await AzCliCommands.GetAspireResourceGroups(context).ConfigureAwait(false);
+
+                if (resourceGroupNames.Length > 0)
+                {
+                    foreach (var resourceGroupName in resourceGroupNames)
+                    {
+                        context.Logger.LogInformation("Deleting resource group {ResourceGroupName}...", resourceGroupName);
+
+                        if (requireConfirm && interaction.IsAvailable)
+                        {
+                            var shouldDelete = await interaction.PromptInputsAsync(
+                                "Confirm Deletion", $"Deleting resource group {resourceGroupName}",
+                                cancellationToken: context.CancellationToken,
+                                inputs: confirmInput).ConfigureAwait(false);
+
+                            if (shouldDelete.Canceled || bool.Parse(shouldDelete.Data[0].Value ?? "false") is false)
+                            {
+                                continue;
+                            }
+                        }
+
+                        await AzCliCommands.DeleteResourceGroup(resourceGroupName, context).ConfigureAwait(false);
+                    }
+                }
+            }
+
+            async Task DeleteFoundryResources()
+            {
+                var foundryResources = context.Model.Resources
+                                        .OfType<AzureAIFoundryResource>();
+
+                foreach (var foundryResource in foundryResources)
+                {
+                    context.Logger.LogInformation("Checking whether {FoundryAccountName} is soft-deleted...", foundryResource.Name);
+
+                    var foundryResourceIds = await AzCliCommands.GetSoftDeletedFoundryAccounts(foundryResource.Name, context).ConfigureAwait(false);
+                    var resourceIdsToDelete = new List<string>();
+
+                    if (foundryResourceIds.Length > 0)
+                    {
+                        foreach (var resourceId in foundryResourceIds)
+                        {
+                            if (requireConfirm && interaction.IsAvailable)
+                            {
+                                var shouldDelete = await interaction.PromptInputsAsync(
+                                    "Confirm Deletion", $"Deleting AI Foundry resource: {resourceId.Split('/').Last()}",
+                                    cancellationToken: context.CancellationToken,
+                                    inputs: confirmInput).ConfigureAwait(false);
+
+                                if (bool.Parse(shouldDelete.Data?[0].Value ?? "false") is false)
+                                {
+                                    continue;
+                                }
+                            }
+
+                            resourceIdsToDelete.Add(resourceId);
+                        }
+                    }
+
+                    await AzCliCommands.DeleteAzResourceByIds([.. resourceIdsToDelete], context).ConfigureAwait(false);
+                }
+            }
+
+            async Task DeleteAzureDeploymentState()
+            {
+                var deploymentStateManager = context.Services.GetRequiredService<IDeploymentStateManager>();
+                var azureDeploymentConfig = await deploymentStateManager.AcquireSectionAsync("Azure");
+                var copyOfState = new JsonObject();
+
+                foreach (var azDeploymentState in azureDeploymentConfig.Data)
+                {
+                    if (azDeploymentState.Key == "Deployments" || azDeploymentState.Key == "ResourceGroup")
+                    {
+                        continue;
+                    }
+
+                    copyOfState[azDeploymentState.Key] = azDeploymentState.Value?.DeepClone();
+                }
+
+                await deploymentStateManager.SaveSectionAsync(
+                    new DeploymentStateSection("Azure", copyOfState, azureDeploymentConfig.Version)).ConfigureAwait(false);
+
+                context.Logger.LogInformation("Deleted Azure deployment state");
+            }
+
+            async Task DeleteAzureUserSecrets()
+            {
+                var userSecretsManager = context.Services.GetService<IUserSecretsManager>();
+
+                if (userSecretsManager?.FilePath != null && File.Exists(userSecretsManager.FilePath))
+                {
+                    var secretFileContents = await File.ReadAllTextAsync(
+                        userSecretsManager.FilePath,
+                        context.CancellationToken).ConfigureAwait(false);
+
+                    JsonNode rootNode = JsonNode.Parse(secretFileContents)!;
+
+                    if (rootNode is JsonObject rootObject)
+                    {
+                        foreach (var secret in rootObject.DeepClone().AsObject())
+                        {
+                            if (secret.Key.StartsWith("Azure:Deployments:") || secret.Key == "Azure:ResourceGroup")
+                            {
+                                rootObject.Remove(secret.Key);
+                            }
+                        }
+
+                        var updatedSecretFileContents = rootObject.ToJsonString(
+                            new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+
+                        await File.WriteAllTextAsync(
+                            userSecretsManager.FilePath,
+                        updatedSecretFileContents,
+                        context.CancellationToken).ConfigureAwait(false);
+
+                        context.Logger.LogInformation("Deleted Azure deployment state from user secrets");
+                    }
                 }
             }
         });
