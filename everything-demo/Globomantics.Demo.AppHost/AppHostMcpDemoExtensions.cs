@@ -76,9 +76,9 @@ public static class AppHostMcpDemoExtensions
                 try
                 {
 
-                    await AzCliCommands.ConfigureContainerAppAuthWithMicrosoft(hrmApi.Resource.Name, resourceGroupName, tenantId!, clientId!, allowedAudiences, context.CancellationToken).ConfigureAwait(false);
-                    var containerAppEndpoint = await AzCliCommands.GetContainerAppEndpoint(hrmApi.Resource.Name, resourceGroupName, clientId!, context.CancellationToken).ConfigureAwait(false) ?? throw new InvalidOperationException("Failed to retrieve container app endpoint");
-                    await AzCliCommands.ConfigureContainerAppAuthRedirectUri(containerAppEndpoint, clientId!, context.CancellationToken).ConfigureAwait(false);
+                    await AzCliCommands.ConfigureContainerAppAuthWithMicrosoft(hrmApi.Resource.Name, resourceGroupName, tenantId!, clientId!, allowedAudiences, context).ConfigureAwait(false);
+                    var containerAppEndpoint = await AzCliCommands.GetContainerAppEndpoint(hrmApi.Resource.Name, resourceGroupName, clientId!, context).ConfigureAwait(false) ?? throw new InvalidOperationException("Failed to retrieve container app endpoint");
+                    await AzCliCommands.ConfigureContainerAppAuthRedirectUri(containerAppEndpoint, clientId!, context).ConfigureAwait(false);
 
                     await configureAuthTask.CompleteAsync(
                         $"Successfully configured Microsoft Entra authentication for {hrmApi.Resource.Name} ACA resource.",
@@ -109,7 +109,7 @@ public static class AppHostMcpDemoExtensions
             {
                 try
                 {
-                    await AzCliCommands.EnableContainerAppCorsPolicyForMcpInspector(mcp.Resource.Name, resourceGroupName, context.CancellationToken).ConfigureAwait(false);
+                    await AzCliCommands.EnableContainerAppCorsPolicyForMcpInspector(mcp.Resource.Name, resourceGroupName, context).ConfigureAwait(false);
 
                     await configureCorsTask.CompleteAsync(
                         $"Successfully configured CORS policy for {mcp.Resource.Name} ACA resource.",
@@ -133,7 +133,7 @@ public static class AppHostMcpDemoExtensions
     {
         builder.Pipeline.AddStep("clean-az", async (context) =>
         {
-            var confirmAutomatically = Environment.GetCommandLineArgs().Contains("--yes") 
+            var confirmAutomatically = Environment.GetCommandLineArgs().Contains("--yes")
                 || Environment.GetCommandLineArgs().Contains("-y");
 
             if (confirmAutomatically)
@@ -162,7 +162,7 @@ public static class AppHostMcpDemoExtensions
                 {
                     context.Logger.LogInformation("Checking for Aspire-tagged resource groups...");
 
-                    var resourceGroupNames = await AzCliCommands.GetAspireResourceGroups(context.CancellationToken).ConfigureAwait(false);
+                    var resourceGroupNames = await AzCliCommands.GetAspireResourceGroups(context).ConfigureAwait(false);
 
                     if (resourceGroupNames.Length > 0)
                     {
@@ -177,46 +177,51 @@ public static class AppHostMcpDemoExtensions
                                     cancellationToken: context.CancellationToken,
                                     inputs: confirmInput).ConfigureAwait(false);
 
-                                if (shouldDelete.Canceled || bool.Parse(shouldDelete.Data[0].Value ?? "false") is false) {
+                                if (shouldDelete.Canceled || bool.Parse(shouldDelete.Data[0].Value ?? "false") is false)
+                                {
                                     continue;
                                 }
                             }
 
-                            await AzCliCommands.DeleteResourceGroup(resourceGroupName, context.CancellationToken).ConfigureAwait(false);
+                            await AzCliCommands.DeleteResourceGroup(resourceGroupName, context).ConfigureAwait(false);
                         }
                     }
 
                     var foundryResources = context.Model.Resources
                         .OfType<AzureAIFoundryResource>();
 
-                    foreach (var foundryResource in foundryResources) 
+                    foreach (var foundryResource in foundryResources)
                     {
                         context.Logger.LogInformation("Checking whether {FoundryAccountName} is soft-deleted...", foundryResource.Name);
 
-                        var foundryResourceId = await AzCliCommands.GetSoftDeletedFoundryAccount(foundryResource.Name, context.CancellationToken).ConfigureAwait(false);
+                        var foundryResourceIds = await AzCliCommands.GetSoftDeletedFoundryAccounts(foundryResource.Name, context).ConfigureAwait(false);
 
-                        if (!string.IsNullOrEmpty(foundryResourceId))
+                        if (foundryResourceIds.Length > 0)
                         {
-                            if (requireConfirm && interaction.IsAvailable)
+                            foreach (var resourceId in foundryResourceIds)
                             {
-                                var shouldDelete = await interaction.PromptInputsAsync(
-                                    "Confirm Deletion", $"Deleting AI Foundry resource: {foundryResourceId}", 
-                                    cancellationToken: context.CancellationToken,
-                                    inputs: confirmInput).ConfigureAwait(false);
+                                if (requireConfirm && interaction.IsAvailable)
+                                {
+                                    var shouldDelete = await interaction.PromptInputsAsync(
+                                        "Confirm Deletion", $"Deleting AI Foundry resource: {resourceId}",
+                                        cancellationToken: context.CancellationToken,
+                                        inputs: confirmInput).ConfigureAwait(false);
 
-                                if (bool.Parse(shouldDelete.Data?[0].Value ?? "false") is true) {
-                                    context.Logger.LogInformation("Purging Foundry account {FoundryAccountName}...", foundryResourceId);
-
-                                    await AzCliCommands.DeleteAzResourceById(foundryResourceId, context.CancellationToken).ConfigureAwait(false);   
+                                    if (bool.Parse(shouldDelete.Data?[0].Value ?? "false") is false)
+                                    {
+                                        continue;
+                                    }
                                 }
-                            }               
+
+                                await AzCliCommands.DeleteAzResourceById(resourceId, context).ConfigureAwait(false);
+                            }
                         }
                     }
 
                     var deploymentStateManager = context.Services.GetRequiredService<IDeploymentStateManager>();
                     var azureDeploymentConfig = await deploymentStateManager.AcquireSectionAsync("Azure");
                     var copyOfState = new JsonObject();
-                    
+
                     foreach (var azDeploymentState in azureDeploymentConfig.Data)
                     {
                         if (azDeploymentState.Key == "Deployments" || azDeploymentState.Key == "ResourceGroup")
@@ -294,7 +299,8 @@ public static class AppHostMcpDemoExtensions
 
         // Configure host storage when running in publish mode
         // to avoid triggering role assignment check normally
-        if (builder.ExecutionContext.IsPublishMode) {
+        if (builder.ExecutionContext.IsPublishMode)
+        {
             api
                 .WithHostStorage(hrmDocumentStorage)
                 .WithRoleAssignments(hrmDocumentStorage,
@@ -424,7 +430,7 @@ public static class AppHostMcpDemoExtensions
             {
                 try
                 {
-                    var signedInUserPrincipalId = await AzCliCommands.GetSignedInUserPrincipalId(context.CancellationToken).ConfigureAwait(false)
+                    var signedInUserPrincipalId = await AzCliCommands.GetSignedInUserPrincipalId(context).ConfigureAwait(false)
                         ?? throw new InvalidOperationException("Failed to determine signed-in user principal ID from Azure CLI");
                     var storageAccountId = await hrmDocumentStorage.GetOutput("StorageAccountResourceId").GetValueAsync(context.CancellationToken)
                         ?? throw new InvalidOperationException("Failed to determine storage account resource ID from HRM document storage resource outputs");
@@ -628,5 +634,5 @@ public static class AppHostMcpDemoExtensions
         return builder;
     }
 
-    
+
 }

@@ -1,14 +1,17 @@
+#pragma warning disable ASPIREPIPELINES001
+
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Aspire.Hosting.Pipelines;
+using Microsoft.Extensions.Logging;
 
 namespace Globomantics.Demo.AppHost.Azure;
 
 internal static class AzCliCommands
 {
-    public static async Task EnableContainerAppCorsPolicyForMcpInspector(string containerAppName, string resourceGroupName, CancellationToken ct)
+    public static async Task EnableContainerAppCorsPolicyForMcpInspector(string containerAppName, string resourceGroupName, PipelineStepContext ctx)
     {
-        await RunAzCliCommand(ct,
+        await RunAzCliCommand(ctx,
             "containerapp", "ingress", "cors", "enable",
             "--name", containerAppName,
             "--resource-group", resourceGroupName,
@@ -16,9 +19,9 @@ internal static class AzCliCommands
         ).ConfigureAwait(false);
     }
 
-    public static async Task ConfigureContainerAppAuthWithMicrosoft(string containerAppName, string resourceGroupName, string tenantId, string clientId, string[] allowedAudiences, CancellationToken ct)
+    public static async Task ConfigureContainerAppAuthWithMicrosoft(string containerAppName, string resourceGroupName, string tenantId, string clientId, string[] allowedAudiences, PipelineStepContext ctx)
     {
-        await RunAzCliCommand(ct,
+        await RunAzCliCommand(ctx,
             "containerapp", "auth", "microsoft", "update",
             "--name", containerAppName,
             "--resource-group", resourceGroupName,
@@ -30,9 +33,9 @@ internal static class AzCliCommands
         ).ConfigureAwait(false);
     }
 
-    public static async Task<Uri?> GetContainerAppEndpoint(string containerAppName, string resourceGroupName, string clientId, CancellationToken ct)
+    public static async Task<Uri?> GetContainerAppEndpoint(string containerAppName, string resourceGroupName, string clientId, PipelineStepContext ctx)
     {
-        var fqdn = await RunAzCliCommand(ct,
+        var fqdn = await RunAzCliCommand(ctx,
             "containerapp", "show",
             "--name", containerAppName,
             "--resource-group", resourceGroupName,
@@ -53,18 +56,18 @@ internal static class AzCliCommands
         return uri;
     }
 
-    public static async Task ConfigureContainerAppAuthRedirectUri(Uri containerEndpoint, string clientId, CancellationToken ct)
+    public static async Task ConfigureContainerAppAuthRedirectUri(Uri containerEndpoint, string clientId, PipelineStepContext ctx)
     {
-        await RunAzCliCommand(ct,
+        await RunAzCliCommand(ctx,
             "ad", "app", "update",
             "--id", clientId,
             "--web-redirect-uris", new Uri(containerEndpoint, ".auth/login/aad/callback").ToString()
         ).ConfigureAwait(false);
     }
 
-    public static async Task<string[]> GetAspireResourceGroups(CancellationToken ct)
+    public static async Task<string[]> GetAspireResourceGroups(PipelineStepContext ctx)
     {
-        var resourceGroups = await RunAzCliCommand(ct,
+        var resourceGroups = await RunAzCliCommand(ctx,
             "group", "list",
             "--query", "[?tags.aspire=='true'].{name: name}",
             "-o", "tsv"
@@ -73,38 +76,39 @@ internal static class AzCliCommands
         return [.. resourceGroups.Split("\n", StringSplitOptions.RemoveEmptyEntries).Select(r => r.Trim())];
     }
 
-    public static async Task DeleteResourceGroup(string resourceGroupName, CancellationToken ct)
+    public static async Task DeleteResourceGroup(string resourceGroupName, PipelineStepContext ctx)
     {
-        await RunAzCliCommand(ct,
+        await RunAzCliCommand(ctx,
             "group", "delete",
             "--name", resourceGroupName,
             "--yes"
         ).ConfigureAwait(false);
     }
 
-    public static async Task<string> GetSoftDeletedFoundryAccount(string foundryResourceName, CancellationToken ct)
+    public static async Task<string[]> GetSoftDeletedFoundryAccounts(string foundryResourceName, PipelineStepContext ctx)
     {
-        var deletedFoundryAccount =  await RunAzCliCommand(ct,
+        var deletedFoundryAccounts =  await RunAzCliCommand(ctx,
             "cognitiveservices", "account", "list-deleted",
             "--query", $"[?tags.\"aspire-resource-name\"=='{foundryResourceName}'].id",
             "-o", "tsv"
         ).ConfigureAwait(false);
 
-        return deletedFoundryAccount;
+        return deletedFoundryAccounts.Split(Environment.NewLine, 
+            StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
     }
 
-    public static async Task DeleteAzResourceById(string resourceId, CancellationToken ct)
+    public static async Task DeleteAzResourceById(string resourceId, PipelineStepContext ctx)
     {
-        await RunAzCliCommand(ct,
+        await RunAzCliCommand(ctx,
             "resource", "delete",
             "--ids", resourceId,
             "--no-wait"
         ).ConfigureAwait(false);
     }
 
-    public static async Task<Guid?> GetSignedInUserPrincipalId(CancellationToken ct)
+    public static async Task<Guid?> GetSignedInUserPrincipalId(PipelineStepContext ctx)
     {
-        var signedInUserId = await RunAzCliCommand(ct,
+        var signedInUserId = await RunAzCliCommand(ctx,
             "ad", "signed-in-user", "show",
             "--query", "id",
             "--output", "tsv"
@@ -113,17 +117,26 @@ internal static class AzCliCommands
         return Guid.TryParse(signedInUserId, out var userId) ? userId : null;
     }
 
-    static async Task<string> RunAzCliCommand(CancellationToken cancellationToken = default, params string[] args)
+    static async Task<string> RunAzCliCommand(PipelineStepContext ctx, params string[] args)
     {
         using var azProcess = Process.Start(CreateAzStartInfo(args)) ?? throw new InvalidOperationException("Failed to start az CLI process");
 
-        var stdoutTask = azProcess.StandardOutput.ReadToEndAsync(cancellationToken);
-        var stderrTask = azProcess.StandardError.ReadToEndAsync(cancellationToken);
+        if (ctx.Logger.IsEnabled(LogLevel.Debug)) {
+            ctx.Logger.LogDebug("Launching process: {Process} {Args}", azProcess.StartInfo.FileName, string.Join(" ", azProcess.StartInfo.ArgumentList));
+        }
 
-        await azProcess.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        var stdoutTask = azProcess.StandardOutput.ReadToEndAsync(ctx.CancellationToken);
+        var stderrTask = azProcess.StandardError.ReadToEndAsync(ctx.CancellationToken);
+
+        await azProcess.WaitForExitAsync(ctx.CancellationToken).ConfigureAwait(false);
 
         var stdout = await stdoutTask.ConfigureAwait(false);
         var stderr = await stderrTask.ConfigureAwait(false);
+
+        if (ctx.Logger.IsEnabled(LogLevel.Debug)) {
+            stdout.Split(Environment.NewLine).ToList().ForEach(line => ctx.Logger.LogDebug("Az CLI STDOUT: {StdOut}", line));
+            stderr.Split(Environment.NewLine).ToList().ForEach(line => ctx.Logger.LogDebug("Az CLI STDERR: {StdErr}", line));
+        }
 
         if (azProcess.ExitCode != 0)
         {
@@ -142,7 +155,7 @@ internal static class AzCliCommands
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
-            CreateNoWindow = true,
+            CreateNoWindow = true
         };
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))

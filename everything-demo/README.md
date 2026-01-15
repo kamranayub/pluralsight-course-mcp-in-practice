@@ -293,7 +293,7 @@ az group delete --name $rg --yes --no-wait
 Then, find and purge all soft-deleted Foundry resources that match the expected Aspire resource name:
 
 ```sh
-foundry=$(az cognitiveservices account list-deleted --query '[?tags."aspire-resource-name"=='hrm-foundry'].id' -o tsv)
+foundry=$(az cognitiveservices account list-deleted --query "[?tags.\"aspire-resource-name\"=='hrm-foundry'].id" -o tsv)
 az resources delete --ids $foundry
 ```
 
