@@ -1,0 +1,12 @@
+{
+    "servers": {
+        "globomantics-mcp-server-local": {            
+            "type": "http",
+            "url": "http://localhost:5000/"
+        },
+        "globomantics-mcp-server-remote": {
+            "type": "http",
+            "url": "https://mcp.ENVIRONMENT.eastus.azurecontainerapps.io"
+        }
+    }
+}

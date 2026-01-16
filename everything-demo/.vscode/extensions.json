@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "ms-azuretools.vscode-azurefunctions",
+    "ms-dotnettools.csharp",
+    "Trottero.dotnetwatchattach",
+    "microsoft-aspire.aspire-vscode",
+    "ms-dotnettools.csdevkit",
+    "huntertran.auto-markdown-toc"
+  ]
+}
