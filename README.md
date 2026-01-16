@@ -95,6 +95,8 @@ Please report course issues using the [Issues](issues) page or the Pluralsight d
 
 ## Updates
 
+Please see the [GitHub Releases](releases) for more information.
+
 - **January 2026**
   - Fixed a typo causing `demo-final` to fail to build
   - Added Aspire-based demos for ease of use
