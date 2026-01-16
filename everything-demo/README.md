@@ -29,13 +29,14 @@ This is the full course demo project. It uses [Aspire](https://aspire.dev), a cr
     - [Preparing the Deployment](#preparing-the-deployment)
     - [Connecting to the Remote MCP Server](#connecting-to-the-remote-mcp-server)
     - [Testing with MCP Inspector](#testing-with-mcp-inspector)
-    - [Custom Pipeline Deployment Steps](#custom-pipeline-deployment-steps)
     - [Deployment Troubleshooting](#deployment-troubleshooting)
 - [Aspire Architecture](#aspire-architecture)
     - [HRM API](#hrm-api)
     - [MCP Server](#mcp-server)
+    - [MCP Inspector](#mcp-inspector)
     - [Azure Blob Storage](#azure-blob-storage)
     - [Azure AI Search](#azure-ai-search)
+    - [Custom Pipeline Deployment Steps](#custom-pipeline-deployment-steps)
 
 <!-- /TOC -->
 
@@ -765,6 +766,94 @@ Once it launches your browser, connect to the MCP server ingress URL displayed i
 > If deployed in **Protected Mode**, you can go through the Guided OAuth Flow to test out the authentication.
 > Be sure to use the static MCP server client ID, since Microsoft Entra does not support Dynamic Client Registration (DCR).
 
+### Deployment Troubleshooting
+
+#### Deployment fails with container runtime error
+
+You must have a OCI-compliant container runtime installed, see the [Aspire Prerequisites](https://aspire.dev/get-started/prerequisites/).
+
+Docker is supported by default. If you are using an alternative such as Podman, update your Aspire configuration:
+
+```sh
+export ASPIRE_CONTAINER_RUNTIME=podman
+```
+
+> [!TIP]
+> You can set this in your shell profile to apply to all `aspire deploy` runs.
+
+#### Deployment fails with ResourceGroupBeingDeleted
+
+You probably just ran `aspire do clean-az --no-wait`, didn't you? :smile:
+
+You will have to wait for the resource group to be deprovisioned, which can take ~20 minutes. 
+
+If you're impatient, you can change the resource group name by clearing the resource group deployment state.
+
+In the `aspire do` logs, look for the following line:
+
+```sh
+[INF] Deployment state will be loaded from: /a/long/path/to/production.json
+```
+
+Open this file and modify the `Azure:ResourceGroup` name to change what resource group `aspire deploy` will provision.
+
+## Aspire Architecture
+
+At a high-level, there are two servers being orchestrated together, the MCP server and a downstream "HRM API" backend (a mock server).
+
+However, because MCP is a polyglot technology, you also need the Node.js-based MCP Inspector for debugging. And because Microsoft Entra ID doesn't support MCP servers very well, there's a custom patch applied. And because OAuth is hard, there's automation built-in to configure redirect URIs and set up your Azure Container App (ACA) web configuration and CORS policies. And because Azure Functions can run locally, it requires a storage backend using Azurite. And because the course demos Azure AI Search, you need to provision AI Foundry, a model deployment, and AI Search Service. And because you need PDFs to index to do vector searches on, it takes care of uploading those to Azure storage and running the indexer on them. Oh, and by the way, authentication should be optional because configuring Entra ID is annoying, and maybe you don't have an Azure subscription (yet!) so that should also be optional.
+
+You know, _practical._
+
+So, how on Earth can you make that all work in **a single command**?
+
+Simple: use [Aspire](https://aspire.dev).
+
+It's like Docker Compose on steroids. It's not _only_ for .NET projects. As this demo shows, it's a robust polyglot service orchestrator and deployment tool that lets you do _pretty much anything_.
+
+### HRM API
+
+#### Overview
+- Implemented as Azure Functions (C# .NET) exposing a small HRM-compatible HTTP API.
+- Uses OpenAPI attributes to annotate operations, parameters and responses so the function app can produce API documentation and client metadata.
+- Lightweight, serverless design intended for demo / test usage backed by an in-memory MockDataStore.
+
+#### Authentication & identity
+- Azure Functions App has "EasyAuth" enabled, which injects authenticted user principal in HTTP headers.
+- Daemon aka S2S auth flow presents `Bearer` token in `Authorization` header for EasyAuth to authenticate (application-only authentication).
+- Native app aka OBO (On-Behalf-Of) flow requires MCP client to authenticate and MCP server to forward credetials for impersonation (delegated access).
+- The functions read claims from the incoming HttpRequest headers to identify the caller.
+- The code extracts an email claim from the parsed ClaimsPrincipal and maps it to an Employee ID via the mock store. Missing/invalid authentication returns 401.
+
+#### Data & persistence
+- Current implementation uses a MockDataStore in memory (Workers, AbsenceTypes, BenefitPlans, TimeOffRequests).
+- Time off requests are appended in-memory and assigned a GUID for demonstration.
+- Production guidance: replace MockDataStore with durable persistence (database, blob or managed service), and avoid in-memory state across function instances.
+
+#### Notes
+- The API follows conventional RESTful structure for resource paths and HTTP verbs but embeds specific query conventions (e.g., Worker!Employee_ID and fixed category usage) to match the HRM integration surface.
+
+### MCP Server
+
+- The MCP server when run **locally** uses S2S (system identity) auth to talk to the HRM API and AI Search Service. This is the end-state of M3.
+- The MCP server when run **remotely** uses OBO delegated auth. It is hosted on Azure Functions using the MCP Handler customization (and not the MCP Handler extension preview). This is the end-state of M4.
+
+### MCP Inspector
+
+The `mcp-inspector` resource runs when you execute `aspire run` and is pre-configured to connect to the MCP server.
+
+#### MCP Inspector Entra Patcher
+
+Due to the [Microsoft Entra](#mcp-client-compatibility-with-entra-id) incompatibility, this is a wrapper around the `npx patch-package` script that applies the patches in `./patches` so you don't have to worry about it. It is not needed for other MCP-friendly OAuth authorization servers.
+
+### Azure Blob Storage
+
+The `hrm-document-storage` Azure storage resource contains a `globomanticshrdocs` Blob container. This container keeps several PDFs (found in `./documents`).
+
+### Azure AI Search
+
+The `hrm-search-service` exposes a search index that indexes the PDF documents for RAG vector search. The AI foundry `hrm-foundry` resource deploys an embedding model (`hrm-embeddings`) using OpenAI's `text-embedding-ada-002` and supports querying by text with automatic vectorization.
+
 ### Custom Pipeline Deployment Steps
 
 The `aspire deploy` pipeline [can be customized](https://aspire.dev/get-started/pipelines/) to perform custom application-specific steps. These
@@ -829,74 +918,3 @@ This step will automatically upload all the PDF documents in the `Globomantics.D
 provisioned Azure Storage blob container.
 
 This is to enable the Azure AI Search indexer to index the documents into the vector database.
-
-### Deployment Troubleshooting
-
-#### Deployment fails with container runtime error
-
-You must have a OCI-compliant container runtime installed, see the [Aspire Prerequisites](https://aspire.dev/get-started/prerequisites/).
-
-Docker is supported by default. If you are using an alternative such as Podman, update your Aspire configuration:
-
-```sh
-export ASPIRE_CONTAINER_RUNTIME=podman
-```
-
-> [!TIP]
-> You can set this in your shell profile to apply to all `aspire deploy` runs.
-
-#### Deployment fails after deleting production resources
-
-Aspire stores deployment state separately when using `aspire deploy` then it does when using `aspire run`.
-
-When you run `aspire deploy`, it should print out a message like this:
-
-```sh
-(deploy-prereq) i [INF] Deployment state will be loaded from: /a/long/path/to/production.json
-```
-
-That file is what stores the _deployment_ secrets. You need to perform [the same cleanup](#deleting-and-cleaning-up-resources) where you delete all `Azure:Deployments:*` keys from the file.
-
-This will force Aspire to re-provision the resources from scratch.
-
-## Aspire Architecture
-
-### HRM API
-
-#### Overview
-- Implemented as Azure Functions (C# .NET) exposing a small HRM-compatible HTTP API.
-- Uses OpenAPI attributes to annotate operations, parameters and responses so the function app can produce API documentation and client metadata.
-- Lightweight, serverless design intended for demo / test usage backed by an in-memory MockDataStore.
-
-#### Authentication & identity
-- Azure Functions App has "EasyAuth" enabled, which injects authenticted user principal in HTTP headers.
-- Daemon aka S2S auth flow presents `Bearer` token in `Authorization` header for EasyAuth to authenticate (application-only authentication).
-- Native app aka OBO (On-Behalf-Of) flow requires MCP client to authenticate and MCP server to forward credetials for impersonation (delegated access).
-- The functions read claims from the incoming HttpRequest headers to identify the caller.
-- The code extracts an email claim from the parsed ClaimsPrincipal and maps it to an Employee ID via the mock store. Missing/invalid authentication returns 401.
-
-#### Data & persistence
-- Current implementation uses a MockDataStore in memory (Workers, AbsenceTypes, BenefitPlans, TimeOffRequests).
-- Time off requests are appended in-memory and assigned a GUID for demonstration.
-- Production guidance: replace MockDataStore with durable persistence (database, blob or managed service), and avoid in-memory state across function instances.
-
-#### Notes
-- The API follows conventional RESTful structure for resource paths and HTTP verbs but embeds specific query conventions (e.g., Worker!Employee_ID and fixed category usage) to match the HRM integration surface.
-
-### MCP Server
-
-- The MCP server when run **locally** uses S2S (system identity) auth to talk to the HRM API and AI Search Service. This is the end-state of M3.
-- The MCP server when run **remotely** uses OBO delegated auth. It is hosted on Azure Functions using the MCP Handler customization (and not the MCP Handler extension preview). This is the end-state of M4.
-
-### Azure Blob Storage
-
-The `sthrmdocs` Azure storage account contains a `globomanticshrm` Blob container. This container keeps several PDFs (found in repo). Each blob has metadata:
-
-- **Description:** A brief LLM-friendly description of the document.
-- **Category:** A `PlanDocumentCategory` string enum value (defined in MCP Server `HrmDocumentService` model).
-
-The `Category` metadata is used to correlate a benefit document with benefit plan data from the HRM API. This is specific to the MCP server design.
-
-### Azure AI Search
-
-The search service exposes a search index that indexes the PDF documents for RAG vector search. It uses an embedding model and supports querying by text.
