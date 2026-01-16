@@ -151,20 +151,35 @@ Just click the **Start** command over the MCP server name to start it. Reference
 
 ### Claude Desktop (optional)
 
-In the course, Claude is used to demo the MCP server for STDIO and Streamable HTTP transport. With authentication disabled, you can configure the MCP server in `claude_desktop_config.json` (Settings -> Developer):
+In the course, Claude Desktop is used to demo the MCP server for STDIO. However, Aspire hosts the MCP server as Streamable HTTP, which isn't
+supported "out-of-the-box" with Claude Desktop. Luckily, you can proxy the HTTP server using the Python package [mcp-proxy](https://github.com/sparfenyuk/mcp-proxy).
+
+First, run the Aspire project **without authentication**:
+
+```sh
+aspire run # default EnableMcpAuth=false
+```
+
+Then, you can configure the MCP server in `claude_desktop_config.json` (Settings -> Developer -> Edit Config):
 
 ```json
 {
     "mcpServers": {
         "globomantics-mcp-server-local": {            
-            "type": "http",
-            "url": "http://localhost:5000/"
+            "command": "docker", // or "podman"
+            "args": [
+                "run", "--rm", "-i", "sparfenyuk/mcp-proxy:v0.11.0",
+                "http://host.containers.internal:5000/",
+                "--transport", "streamablehttp"
+            ]
         }
     }
 }
 ```
 
-This is shown step-by-step in the course or you can [reference this guide by MCPBundles](https://www.mcpbundles.com/blog/claude-desktop-mcp#claude-desktop-mcp-config-file-location).
+> [!NOTE]
+> This uses Docker (or Podman) to run the `mcp-proxy` package which should be installed for Aspire as a prerequisite anyway. You can also
+> use `uv` or PyPi to run the package if you have Python installed.
 
 ### ChatGPT
 
