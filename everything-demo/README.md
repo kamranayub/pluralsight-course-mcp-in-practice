@@ -1,6 +1,6 @@
-# Full Demo
+# The Everything Demo
 
-This is the full course demo project. It uses [Aspire](https://aspire.dev), a cross-platform Infrastructure-as-Code (IaC) local development environment.
+This is the full course demo project. The kitchen sink, so to speak. It uses [Aspire](https://aspire.dev), a cross-platform orchestrator for spinning up local development environments with service discovery and resource provisioning.
 
 <!-- TOC depthfrom:2 depthto:3 -->
 
@@ -149,6 +149,13 @@ In the `.vscode/mcp.json` configuration, the MCP server is already set up:
 ```
 
 Just click the **Start** command over the MCP server name to start it. Reference the course or [VS Code documentation](https://code.visualstudio.com/docs/copilot/customization/mcp-servers) for how to use with Copilot Agent mode.
+
+Click the **More -> Show Output** menu item to display logs to diagnose issues with the MCP server. Turn on `Debug` level logging to see the raw JSON-RPC messages being sent.
+
+When deploying to Azure, use the `mcp` Container Apps ingress URL.
+
+> [!TIP]
+> If you are using **Protected Mode** with `--EnableMcpAuth=true`, and you try to add both a local and remote MCP server to VS Code, it will try to reuse the authentication and the MCP server may not start properly. You should completely exit out of VS Code when adding the deployed MCP server to the config.
 
 ### Claude Desktop (optional)
 

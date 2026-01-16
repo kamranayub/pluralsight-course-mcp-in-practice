@@ -227,9 +227,6 @@ static void ConfigureHrmServices(IHostApplicationBuilder builder, bool enableDel
                     var token = await hrmOboCredential.GetTokenAsync(
                         new TokenRequestContext([$"api://{hrmAppId}/user_impersonation"]), cancellationToken);
 
-                    services.GetRequiredService<ILogger<Program>>()
-                        .LogDebug("Acquired OBO token for HRM API on behalf of user: {Token}", token.Token);
-
                     request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Token);
                 });
         });
