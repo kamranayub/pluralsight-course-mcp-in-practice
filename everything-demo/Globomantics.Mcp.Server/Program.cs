@@ -180,8 +180,8 @@ static void ConfigureHrmServices(IHostApplicationBuilder builder, bool enableDel
     }
     else
     {
-        // local development environment
-        azureCredential = new DefaultAzureCredential();
+        // local development environment uses Az CLI
+        azureCredential = new AzureCliCredential();
     }
 
     var hrmBlobServiceConnectionString = builder.Configuration["HRM_BLOB_SERVICE_CONNECTIONSTRING"];
@@ -226,6 +226,10 @@ static void ConfigureHrmServices(IHostApplicationBuilder builder, bool enableDel
 
                     var token = await hrmOboCredential.GetTokenAsync(
                         new TokenRequestContext([$"api://{hrmAppId}/user_impersonation"]), cancellationToken);
+
+                    services.GetRequiredService<ILogger<Program>>()
+                        .LogDebug("Acquired OBO token for HRM API on behalf of user: {Token}", token.Token);
+
                     request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Token);
                 });
         });

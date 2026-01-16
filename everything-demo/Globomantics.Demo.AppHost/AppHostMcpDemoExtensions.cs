@@ -51,6 +51,7 @@ public static class AppHostMcpDemoExtensions
             .WithEnvironment("MCP_SERVER_AAD_CLIENT_SECRET", mcpServerAadClientSecret);
 
         hrmApi
+            .WithEnvironment("AZURE_TENANT_ID", azureTenantId)
             .WithEnvironment("HRM_API_AAD_CLIENT_ID", hrmApiAadClientId)
             .WithEnvironment("WEBSITE_AUTH_AAD_ALLOWED_TENANTS", azureTenantId)
             .WithEnvironment("MICROSOFT_PROVIDER_AUTHENTICATION_SECRET", hrmApiAadClientSecret);

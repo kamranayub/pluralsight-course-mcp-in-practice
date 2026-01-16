@@ -1,18 +1,15 @@
 #pragma warning disable ASPIREINTERACTION001 
 
-using Aspire.Hosting.Azure;
 using Aspire.Hosting.JavaScript;
 using Azure.Identity;
 using Azure.Provisioning;
 using Azure.Provisioning.Storage;
-using Azure.Storage.Blobs;
 using Globomantics.Demo.AppHost.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Projects;
 
-var azureCredential = new DefaultAzureCredential();
+var azureCredential = new AzureCliCredential();
 var builder = DistributedApplication.CreateBuilder(args);
 
 var enableAzureMode = builder.Configuration.GetValue("EnableAzure", false) || builder.ExecutionContext.IsPublishMode;
