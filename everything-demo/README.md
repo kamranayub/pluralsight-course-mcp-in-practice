@@ -68,6 +68,7 @@ node -v # Should be 22.x or above
 npm -v # Should be 10.x or above
 aspire --version # Should be 13.1 or above
 func -v # Should be 4.6.0 or above
+docker -v # or podman -v
 ```
 
 ## Get Started
@@ -81,7 +82,7 @@ aspire run
 > [!IMPORTANT]
 > If this is your first time running an Aspire project, the `aspire run` command will prompt you to **Trust certificates**. On Windows and macOS, you can follow the prompts. These are required for the local development environment to use HTTPS.
 
-If everything is working, you will Aspire print out the service information like this:
+If everything is working, you Aspire will print out the service information like this:
 
 ```sh
 
@@ -103,6 +104,10 @@ The following Aspire resources should be **Healthy**:
 - `mcp-inspector` - MCP inspector (npx) hosted by default at `http://localhost:6274`
 - `mcp-inspector-entra-patcher` - Fixes a known issue with MCP Inspector that makes it incompatible with Entra ID-based OAuth flows
 - `hrm-documents-storage` - Azure blob storage (with PDFs pre-baked)
+- `funcstorage*` - Azure Functions storage (local)
+
+> [!NOTE]
+> You will see alerts at the top about **Anonymous** authentication and **Azure support.** More details on that below!
 
 There are more commands you can run:
 
