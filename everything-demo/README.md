@@ -151,7 +151,7 @@ aspire do clean-az [-y/--yes] [--no-wait]
 When you run `aspire deploy`, Aspire provisions all your resources but you'll need to manually clean it up. This command will help [clean up and teardown resources](#deleting-and-cleaning-up-resources) in Azure.
 
 > [!NOTE]
-> Azure teardown and de-provisioning is likely to come to Aspire in the future so this won't be needed. Aspire deployment is currently experimental! You can also use `azd` to setup and teardown Azure development environments, which is what [earlier versions of the course did](../releases).
+> Azure teardown and de-provisioning is likely to come to Aspire in the future so this won't be needed. Aspire deployment is currently experimental! You can also use `azd` to setup and teardown Azure development environments, which is what [earlier versions of the course did](https://github.com/kamranayub/pluralsight-course-mcp-in-practice/releases).
 
 ## Using the MCP Inspector
 
