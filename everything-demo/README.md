@@ -100,9 +100,9 @@ If everything is working, Aspire will print out the service information like thi
                Press CTRL+C to stop the apphost and exit. 
 ```
 
-Follow the **Dashboard** link to view the Aspire dashboard and find your service URLs.
+Follow the **Dashboard** link to view the [Aspire dashboard](https://aspire.dev/dashboard/overview/) and find your service URLs.
 
-The following Aspire resources should be **Healthy**:
+The following Aspire resources should be :green_circle: **Running**:
 
 - `mcp` - MCP server project (C#) hosted by default at `http://localhost:5000`
 - `hrm-api` - Azure Functions project hosted on `http://localhost:5002`
