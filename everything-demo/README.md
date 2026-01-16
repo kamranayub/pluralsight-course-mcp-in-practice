@@ -4,6 +4,8 @@ This is the full course demo project. The kitchen sink, so to speak. It uses [As
 
 ![Aspire Dashboard](../.github/docs-aspire-dashboard.jpeg)
 
+# On This Page
+
 <!-- TOC depthfrom:2 depthto:3 -->
 
 - [Prerequisites](#prerequisites)
