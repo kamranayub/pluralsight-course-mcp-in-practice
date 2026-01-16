@@ -52,7 +52,7 @@ This is the full course demo project. The kitchen sink, so to speak. It uses [As
 - [Azure Functions Core Tools](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local) 4.6.0+
 - [Node.js 22+](https://nodejs.org)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) or [Podman](https://podman.io)
-- For Azure support:_ [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest)
+- _For Azure support:_ [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest)
 - _Recommended:_ [Visual Studio Code](https://code.visualstudio.com)
 
 The Aspire CLI (`aspire`) must be installed and available on the path. You can install using the following scripts.
