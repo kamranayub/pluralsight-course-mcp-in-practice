@@ -47,7 +47,7 @@ If you are looking for entry-level courses, the MCP documentation and various SD
 
 ## The Everything Demo
 
-Inside the `everything-demo` folder, you will find a production-grade MCP server using the MCP C# SDK with [Aspire](htttps://aspire.dev) tooling and deployable to Azure Container Apps (ACA). The course covers the high-level aspects of this but doesn't delve under the hood.
+Inside the [`everything-demo`](everything-demo) folder, you will find a production-grade MCP server using the MCP C# SDK with [Aspire](htttps://aspire.dev) tooling and deployable to Azure Container Apps (ACA). The course covers the high-level aspects of this but doesn't delve under the hood.
 
 ### Features
 
