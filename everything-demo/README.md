@@ -49,10 +49,10 @@ This is the full course demo project. The kitchen sink, so to speak. It uses [As
 
 - Follow the [Aspire](https://aspire.dev/get-started/prerequisites/) prerequisites guide
 - [.NET 8 SDK](https://get.dot.net/8) and the [.NET 10 SDK](https://get.dot.net/10)
-- [Azure Functions Core Tools](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local)
+- [Azure Functions Core Tools](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local) 4.6.0+
 - [Node.js 22+](https://nodejs.org)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) or [Podman](https://podman.io)
-- _Optional:_ [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest) for Azure integration
+- For Azure support:_ [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest)
 - _Recommended:_ [Visual Studio Code](https://code.visualstudio.com)
 
 The Aspire CLI (`aspire`) must be installed and available on the path. You can install using the following scripts.
@@ -87,7 +87,7 @@ aspire run
 > [!IMPORTANT]
 > If this is your first time running an Aspire project, the `aspire run` command will prompt you to **Trust certificates**. On Windows and macOS, you can follow the prompts. These are required for the local development environment to use HTTPS.
 
-If everything is working, you Aspire will print out the service information like this:
+If everything is working, Aspire will print out the service information like this:
 
 ```sh
 
