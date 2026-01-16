@@ -2,14 +2,17 @@
 
 This is the full course demo project. The kitchen sink, so to speak. It uses [Aspire](https://aspire.dev), a cross-platform orchestrator for spinning up local development environments with service discovery and resource provisioning.
 
+![Aspire Dashboard](../.github/docs-aspire-dashboard.jpeg)
+
 <!-- TOC depthfrom:2 depthto:3 -->
 
 - [Prerequisites](#prerequisites)
 - [Get Started](#get-started)
+    - [Project Commands and Modes](#project-commands-and-modes)
 - [Using the MCP Inspector](#using-the-mcp-inspector)
 - [Connecting to the MCP Server](#connecting-to-the-mcp-server)
     - [Visual Studio Code default](#visual-studio-code-default)
-    - [Claude Desktop optional](#claude-desktop-optional)
+    - [Claude Desktop](#claude-desktop)
     - [ChatGPT](#chatgpt)
     - [MCP Client Compatibility with Entra ID](#mcp-client-compatibility-with-entra-id)
 - [Azure Provisioning optional](#azure-provisioning-optional)
@@ -109,25 +112,44 @@ The following Aspire resources should be **Healthy**:
 > [!NOTE]
 > You will see alerts at the top about **Anonymous** authentication and **Azure support.** More details on that below!
 
-There are more commands you can run:
+### Project Commands and Modes
+
+The Aspire project supports several options for different commands to adjust the mode the MCP server operates in.
+
+#### Local MCP Server
 
 ```sh
-# Run a Protected MCP server locally (requires Entra ID)
-aspire run --EnableMcpAuth=true
-
-# Run an Anonymous MCP server locally with provisioned Azure resources (AI Search)
-aspire run --EnableAzure=true
-
-# Deploy an Anonymous MCP server to Azure Container Apps (ACA)
-aspire deploy
-# Deploy a Protected MCP server to ACA (requires Entra ID)
-aspire deploy --EnableMcpAuth=true
-
-# Clean up all Azure resources
-aspire do clean-az
+aspire run [--EnableMcpAuth=true] [--EnableAzure=true]
 ```
 
-These are detailed below in their respective sections.
+This will set up and run a local MCP server. By default, it does not require Azure and will operate in **Anonymous Mode**. This is the simplest operating mode and will work with minimal environment dependencies.
+
+The following options are turned off by default but can be enabled by passing the following flags:
+
+- `EnableAzure=true|false` -- Whether or not to allow [provisioning of remote Azure resources](#azure-provisioning-optional), such as AI search
+- `EnableMcpAuth=true|false` -- Whether or not to [protect the MCP server with Entra ID](#enabling-authentication)
+
+#### Remote MCP Server
+
+```sh
+aspire deploy [--EnableMcpAuth=true]
+```
+
+This will [deploy the app](#deploying-to-azure-optional) to Azure Container Apps. It provisions all the resources necessary to run the MCP server and enable all tooling capabilities.
+
+- `EnableMcpAuth=true|false` -- Whether or not to configure Entra ID and Azure Container App Authentication to protect the MCP server (see [Enabling Authentication](#enabling-authentication))
+
+#### Custom Tasks
+
+```sh
+# Teardown Azure resources
+aspire do clean-az [-y/--yes] [--no-wait]
+```
+
+When you run `aspire deploy`, Aspire provisions all your resources but you'll need to manually clean it up. This command will help [clean up and teardown resources](#deleting-and-cleaning-up-resources) in Azure.
+
+> [!NOTE]
+> Azure teardown and de-provisioning is likely to come to Aspire in the future so this won't be needed. Aspire deployment is currently experimental! You can also use `azd` to setup and teardown Azure development environments, which is what [earlier versions of the course did](../releases).
 
 ## Using the MCP Inspector
 
@@ -162,7 +184,7 @@ When deploying to Azure, use the `mcp` Container Apps ingress URL.
 > [!TIP]
 > If you are using **Protected Mode** with `--EnableMcpAuth=true`, and you try to add both a local and remote MCP server to VS Code, it will try to reuse the authentication and the MCP server may not start properly. You should completely exit out of VS Code when adding the deployed MCP server to the config.
 
-### Claude Desktop (optional)
+### Claude Desktop
 
 In the course, Claude Desktop is used to demo the MCP server for STDIO. However, Aspire hosts the MCP server as Streamable HTTP, which isn't
 supported "out-of-the-box" with Claude Desktop. Luckily, you can proxy the HTTP server using the Python package [mcp-proxy](https://github.com/sparfenyuk/mcp-proxy).
@@ -484,6 +506,16 @@ az account show --query tenantId
 
 > [!NOTE]
 > This is your Entra tenant "issuer" that will issue and sign the authentication tokens.
+
+If this is not the Entra Tenant ID you expect (i.e. Work vs. Personal account), you can logout and log back in with a specific tenant:
+
+```
+az logout
+az login --tenant <tenant_id>
+```
+
+> [!IMPORTANT]
+> The Aspire resources all rely on AzureCliCredential under-the-hood to determine the account to provision under. See [Microsoft Learn: Auth During Local Development](https://learn.microsoft.com/en-us/dotnet/azure/sdk/authentication/local-development-dev-accounts).
 
 Add a new user secret (or provide it in the Aspire dashboard):
 
