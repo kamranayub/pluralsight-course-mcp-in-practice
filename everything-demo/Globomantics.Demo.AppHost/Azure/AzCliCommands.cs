@@ -69,7 +69,7 @@ internal static class AzCliCommands
     {
         var resourceGroups = await RunAzCliCommand(ctx,
             "group", "list",
-            "--query", "[?tags.aspire=='true'].{name: name}",
+            "--query", "[?tags.aspire=='true' && properties.provisioningState!='Deleting'].name",
             "-o", "tsv"
         ).ConfigureAwait(false);
 
