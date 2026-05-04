@@ -110,8 +110,8 @@ Please see the [GitHub Releases](releases) for more information.
 ### Courses
 
 - [Model Context Protocol Skill Path](https://app.pluralsight.com/paths/skill/model-context-protocol-mcp)
-- [Model Context Protocol: Getting Started](#) (**In Development**)
-- [Model Context Protocol: Advanced Features](#) (**In Development**)
+- [Model Context Protocol: Introduction](https://www.pluralsight.com/courses/introduction-model-context-protocol-mcp)
+- [Model Context Protocol: Advanced Features](http://www.pluralsight.com/courses/model-context-protocol-advanced-features) ([GitHub](https://github.com/kamranayub/pluralsight-course-mcp-advanced))
 - [Using the Model Context Protocol SDK in C#](https://www.pluralsight.com/courses/using-c-model-context-protocol-sdk)
 - [FastMCP Foundations](https://www.pluralsight.com/courses/fastmcp-foundations1)
 
